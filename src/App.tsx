@@ -30,12 +30,10 @@ const NAV: Record<RoleId, { id: PageId; label: string }[]> = {
   cio: [
     { id: 'overview', label: 'Обзор сбора' },
     { id: 'cio', label: 'Рабочее место ЦИО' },
-    { id: 'rating', label: 'Рейтинг' },
   ],
   omsu: [
     { id: 'overview', label: 'Обзор сбора' },
     { id: 'omsu', label: 'Форма ОМСУ' },
-    { id: 'rating', label: 'Рейтинг' },
   ],
 };
 
@@ -151,7 +149,7 @@ function Shell() {
       </div>
 
       <main className="mx-auto max-w-[1400px] px-4 pb-10">
-        {page === 'overview' && <Overview />}
+        {page === 'overview' && <Overview role={role} />}
         {page === 'setup' && <Setup />}
         {page === 'omsu' && <OmsuForm />}
         {page === 'cio' && <CioWorkspace />}
