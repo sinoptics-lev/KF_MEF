@@ -8,13 +8,14 @@ import { OmsuForm } from '@/pages/OmsuForm';
 import { CioWorkspace } from '@/pages/CioWorkspace';
 import { MefWorkspace } from '@/pages/MefWorkspace';
 import { RatingView } from '@/pages/RatingView';
+import { Description } from '@/pages/Description';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Bell, Landmark, UserRound } from 'lucide-react';
+import { Bell, Landmark, UserRound, BookOpen } from 'lucide-react';
 
-type PageId = 'overview' | 'setup' | 'omsu' | 'cio' | 'mef' | 'rating';
+type PageId = 'overview' | 'setup' | 'omsu' | 'cio' | 'mef' | 'rating' | 'about';
 
 const NAV: Record<RoleId, { id: PageId; label: string }[]> = {
   admin: [
@@ -77,6 +78,15 @@ function Shell() {
           </div>
 
           <div className="ml-auto flex items-center gap-3">
+            <button
+              onClick={() => setPage('about')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                page === 'about' ? 'bg-white text-[#1e5c8f]' : 'bg-white/15 hover:bg-white/25 text-white'
+              }`}
+            >
+              <BookOpen className="h-4 w-4" />
+              Описание системы
+            </button>
             <Popover>
               <PopoverTrigger asChild>
                 <button className="relative flex h-9 w-9 items-center justify-center rounded-full bg-white/15 hover:bg-white/25">
@@ -155,6 +165,7 @@ function Shell() {
         {page === 'cio' && <CioWorkspace />}
         {page === 'mef' && <MefWorkspace goRating={() => setPage('rating')} />}
         {page === 'rating' && <RatingView />}
+        {page === 'about' && <Description />}
       </main>
 
       <footer className="border-t bg-white py-3">
