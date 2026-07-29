@@ -57,13 +57,19 @@ export function OmsuForm() {
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="border-b text-xs text-muted-foreground">
-                    <th className="text-left p-2 w-12">№</th>
-                    <th className="text-left p-2">Показатель</th>
-                    <th className="text-left p-2">ЦИО</th>
-                    <th className="text-left p-2 w-32">Значение</th>
-                    <th className="text-left p-2">Статус</th>
-                    <th className="text-left p-2">Комментарий / подпись</th>
-                    <th className="text-right p-2 w-56">Действия</th>
+                    <th rowSpan={2} className="text-left p-2 w-12 align-middle">№</th>
+                    <th rowSpan={2} className="text-left p-2 align-middle">Показатель</th>
+                    <th rowSpan={2} className="text-left p-2 align-middle">ЦИО</th>
+                    <th className="text-center p-1.5 w-28 border-l border-b bg-green-50/70">Отчёт 2026</th>
+                    <th colSpan={2} className="text-center p-1.5 border-l border-b bg-blue-50/70">Прогноз (2027)</th>
+                    <th rowSpan={2} className="text-left p-2 align-middle">Статус</th>
+                    <th rowSpan={2} className="text-left p-2 align-middle">Комментарий / подпись</th>
+                    <th rowSpan={2} className="text-right p-2 w-56 align-middle">Действия</th>
+                  </tr>
+                  <tr className="border-b text-xs text-muted-foreground">
+                    <th className="text-center p-1.5 border-l bg-green-50/70 font-medium">Факт</th>
+                    <th className="text-center p-1.5 w-28 border-l bg-blue-50/70 font-medium">Базовый вариант</th>
+                    <th className="text-center p-1.5 w-28 bg-blue-50/70 font-medium">Целевой вариант</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -78,27 +84,30 @@ export function OmsuForm() {
                           <div className="text-xs text-muted-foreground">ед. изм.: {ind.unit} · формула: {ind.formula}</div>
                         </td>
                         <td className="p-2"><Badge variant="secondary">{CIOS.find((c) => c.id === ind.cioId)?.short}</Badge></td>
-                        <td className="p-2">
-                          {editable ? (
-                            <Input
-                              type="number"
-                              step="0.01"
-                              className="h-8 w-28"
-                              placeholder="—"
-                              value={v.value ?? ''}
-                              onChange={(e) =>
-                                dispatch({
-                                  type: 'OMSU_SET_VALUE',
-                                  munId,
-                                  indId: ind.id,
-                                  value: e.target.value === '' ? null : Number(e.target.value),
-                                })
-                              }
-                            />
-                          ) : (
-                            <span className="font-medium">{fmt(v.value)}</span>
-                          )}
-                        </td>
+                        {(['value', 'base', 'target'] as const).map((field) => (
+                          <td key={field} className={`p-2 text-center ${field !== 'value' ? 'bg-blue-50/30' : 'bg-green-50/30'}`}>
+                            {editable ? (
+                              <Input
+                                type="number"
+                                step="0.01"
+                                className="h-8 w-24 text-center"
+                                placeholder="—"
+                                value={v[field] ?? ''}
+                                onChange={(e) =>
+                                  dispatch({
+                                    type: 'OMSU_SET_VALUE',
+                                    munId,
+                                    indId: ind.id,
+                                    field,
+                                    value: e.target.value === '' ? null : Number(e.target.value),
+                                  })
+                                }
+                              />
+                            ) : (
+                              <span className={field === 'value' ? 'font-medium' : ''}>{fmt(v[field] ?? null)}</span>
+                            )}
+                          </td>
+                        ))}
                         <td className="p-2"><OmsuStatusBadge status={v.status} /></td>
                         <td className="p-2 text-xs">
                           {v.comment && (

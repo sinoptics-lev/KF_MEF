@@ -29,9 +29,10 @@ export function CioWorkspace() {
   );
 
   // Среднее значение по введённым показателям ОМСУ — по каждому показателю отрасли
-  const avgByInd = (indId: string) => {
+  // и по каждому заполняемому полю (факт / прогноз базовый / прогноз целевой)
+  const avgByInd = (indId: string, field: 'value' | 'base' | 'target') => {
     const vals = MUNICIPALITIES
-      .map((m) => state.omsuValues[m.id]?.[indId]?.value)
+      .map((m) => state.omsuValues[m.id]?.[indId]?.[field])
       .filter((x): x is number => x !== null && x !== undefined);
     return {
       avg: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null,
@@ -75,11 +76,17 @@ export function CioWorkspace() {
                 <table className="w-full text-sm border-collapse">
                   <thead>
                     <tr className="border-b text-xs text-muted-foreground">
-                      <th className="text-left p-2">ОМСУ</th>
-                      <th className="text-left p-2 w-28">Значение</th>
-                      <th className="text-left p-2">Статус</th>
-                      <th className="text-left p-2">Обновлено</th>
-                      <th className="text-right p-2 w-64">Действия</th>
+                      <th rowSpan={2} className="text-left p-2 align-middle">ОМСУ</th>
+                      <th className="text-center p-1.5 w-24 border-l border-b bg-green-50/70">Отчёт 2026</th>
+                      <th colSpan={2} className="text-center p-1.5 border-l border-b bg-blue-50/70">Прогноз (2027)</th>
+                      <th rowSpan={2} className="text-left p-2 align-middle">Статус</th>
+                      <th rowSpan={2} className="text-left p-2 align-middle">Обновлено</th>
+                      <th rowSpan={2} className="text-right p-2 w-64 align-middle">Действия</th>
+                    </tr>
+                    <tr className="border-b text-xs text-muted-foreground">
+                      <th className="text-center p-1.5 border-l bg-green-50/70 font-medium">Факт</th>
+                      <th className="text-center p-1.5 w-24 border-l bg-blue-50/70 font-medium">Базовый вариант</th>
+                      <th className="text-center p-1.5 w-24 bg-blue-50/70 font-medium">Целевой вариант</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -89,7 +96,9 @@ export function CioWorkspace() {
                       return (
                         <tr key={m.id} className={`border-b ${v.status === 'pending_cio' ? 'bg-amber-50/60' : 'hover:bg-slate-50'}`}>
                           <td className="p-2 font-medium">{m.name}</td>
-                          <td className="p-2">{fmt(v.value)}</td>
+                          <td className="p-2 text-center font-medium bg-green-50/30">{fmt(v.value)}</td>
+                          <td className="p-2 text-center bg-blue-50/30">{fmt(v.base ?? null)}</td>
+                          <td className="p-2 text-center bg-blue-50/30">{fmt(v.target ?? null)}</td>
                           <td className="p-2"><OmsuStatusBadge status={v.status} /></td>
                           <td className="p-2 text-xs text-muted-foreground">{v.updatedAt ?? '—'}</td>
                           <td className="p-2 text-right whitespace-nowrap">
@@ -130,9 +139,10 @@ export function CioWorkspace() {
           <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm flex gap-2">
             <Info className="h-4 w-4 text-blue-700 mt-0.5 shrink-0" />
             <span>
-              ЦИО вносит собственные значения по тем же показателям, что заполняют ОМСУ его отрасли. Подпишите ЭЦП и отправьте
-              на согласование в МЭФ. Пока МЭФ не согласовал — можно отозвать на изменение. Для справки по каждому показателю
-              отображается среднее значение по введённым данным ОМСУ.
+              ЦИО вносит собственные значения по тем же показателям, что заполняют ОМСУ его отрасли: факт отчётного периода,
+              прогноз по базовому и целевому вариантам. Подпишите ЭЦП и отправьте на согласование в МЭФ. Пока МЭФ не согласовал —
+              можно отозвать на изменение. Под каждым полем для справки отображается среднее значение по введённым данным ОМСУ
+              (с указанием количества ОМСУ, внёсших значение).
             </span>
           </div>
           <Card>
@@ -140,50 +150,61 @@ export function CioWorkspace() {
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="border-b text-xs text-muted-foreground">
-                    <th className="text-left p-2">Показатель</th>
-                    <th className="text-left p-2">Среднее по ОМСУ</th>
-                    <th className="text-left p-2 w-32">Значение</th>
-                    <th className="text-left p-2">Статус</th>
-                    <th className="text-left p-2">Комментарий МЭФ</th>
-                    <th className="text-right p-2 w-64">Действия</th>
+                    <th rowSpan={2} className="text-left p-2 align-middle">Показатель</th>
+                    <th className="text-center p-1.5 w-28 border-l border-b bg-green-50/70">Отчёт 2026</th>
+                    <th colSpan={2} className="text-center p-1.5 border-l border-b bg-blue-50/70">Прогноз (2027)</th>
+                    <th rowSpan={2} className="text-left p-2 align-middle">Статус</th>
+                    <th rowSpan={2} className="text-left p-2 align-middle">Комментарий МЭФ</th>
+                    <th rowSpan={2} className="text-right p-2 w-64 align-middle">Действия</th>
+                  </tr>
+                  <tr className="border-b text-xs text-muted-foreground">
+                    <th className="text-center p-1.5 border-l bg-green-50/70 font-medium">Факт</th>
+                    <th className="text-center p-1.5 w-28 border-l bg-blue-50/70 font-medium">Базовый вариант</th>
+                    <th className="text-center p-1.5 w-28 bg-blue-50/70 font-medium">Целевой вариант</th>
                   </tr>
                 </thead>
                 <tbody>
                   {myIndicators.map((ind) => {
-                    const v = state.cioValues[ind.id]?.[CURRENT_CIO] ?? { value: null, status: 'not_filled' as const, updatedAt: null };
+                    const v = state.cioValues[ind.id]?.[CURRENT_CIO] ?? { value: null, base: null, target: null, status: 'not_filled' as const, updatedAt: null };
                     const editable = v.status === 'not_filled' || v.status === 'draft' || v.status === 'returned';
-                    const { avg, count } = avgByInd(ind.id);
                     return (
                       <tr key={ind.id} className="border-b hover:bg-slate-50 align-top">
                         <td className="p-2">
                           <div className="font-medium">{ind.num} {ind.name}</div>
                           <div className="text-xs text-muted-foreground">ед. изм.: {ind.unit} · формула: {ind.formula}</div>
                         </td>
-                        <td className="p-2 whitespace-nowrap">
-                          <span className="font-medium text-blue-800">{avg !== null ? fmt(avg) : '—'}</span>{' '}
-                          <span className="text-xs text-muted-foreground">{ind.unit} · {count} ОМСУ</span>
-                        </td>
-                        <td className="p-2">
-                          {editable ? (
-                            <Input
-                              type="number"
-                              step="0.1"
-                              className="h-8 w-28"
-                              placeholder="—"
-                              value={v.value ?? ''}
-                              onChange={(e) =>
-                                dispatch({
-                                  type: 'CIO_SET_OWN',
-                                  cioIndId: ind.id,
-                                  cioId: CURRENT_CIO,
-                                  value: e.target.value === '' ? null : Number(e.target.value),
-                                })
-                              }
-                            />
-                          ) : (
-                            <span className="font-medium">{fmt(v.value)}</span>
-                          )}
-                        </td>
+                        {(['value', 'base', 'target'] as const).map((field) => {
+                          const { avg, count } = avgByInd(ind.id, field);
+                          return (
+                            <td key={field} className={`p-2 text-center ${field !== 'value' ? 'bg-blue-50/30' : 'bg-green-50/30'}`}>
+                              {editable ? (
+                                <Input
+                                  type="number"
+                                  step="0.1"
+                                  className="h-8 w-24 text-center mx-auto bg-white"
+                                  placeholder="—"
+                                  value={v[field] ?? ''}
+                                  onChange={(e) =>
+                                    dispatch({
+                                      type: 'CIO_SET_OWN',
+                                      cioIndId: ind.id,
+                                      cioId: CURRENT_CIO,
+                                      field,
+                                      value: e.target.value === '' ? null : Number(e.target.value),
+                                    })
+                                  }
+                                />
+                              ) : (
+                                <span className={field === 'value' ? 'font-medium' : ''}>{fmt(v[field] ?? null)}</span>
+                              )}
+                              <div className="mt-1 text-xs whitespace-nowrap">
+                                <span className="text-muted-foreground">ср. ОМСУ: </span>
+                                <span className="font-medium text-blue-800">{avg !== null ? fmt(avg) : '—'}</span>
+                                <span className="text-muted-foreground"> · {count}</span>
+                              </div>
+                            </td>
+                          );
+                        })}
                         <td className="p-2"><CioStatusBadge status={v.status} /></td>
                         <td className="p-2 text-xs text-red-700">{v.comment ?? ''}</td>
                         <td className="p-2 text-right whitespace-nowrap">
