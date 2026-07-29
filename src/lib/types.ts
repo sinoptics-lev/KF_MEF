@@ -54,7 +54,9 @@ export interface Indicator {
 }
 
 export interface OmsuValue {
-  value: number | null;
+  value: number | null;    // факт (отчётный период)
+  base?: number | null;    // прогноз, базовый вариант
+  target?: number | null;  // прогноз, целевой вариант
   status: OmsuStatus;
   updatedAt: string | null;
   comment?: string;      // комментарий при возврате
@@ -62,7 +64,9 @@ export interface OmsuValue {
 }
 
 export interface CioValue {
-  value: number | null;
+  value: number | null;    // факт (отчётный период)
+  base?: number | null;    // прогноз, базовый вариант
+  target?: number | null;  // прогноз, целевой вариант
   status: CioStatus;
   updatedAt: string | null;
   comment?: string;

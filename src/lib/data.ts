@@ -79,6 +79,8 @@ export const INDICATORS: Indicator[] = [
   { id: 'i12', num: '4.3', name: 'Уровень уличной преступности на 10 тыс. чел.', directionId: 'd4', cioId: 'c6', unit: 'случаев', optimum: 'min', weight: 1, formula: 'N преступл. / N населения × 10000' },
 ];
 
+
+
 // --- Генерация начальных значений ОМСУ (детерминированный "рандом") ---
 function seedRand(seed: number) {
   let s = seed;
@@ -110,17 +112,19 @@ function buildOmsuValues(): AppState['omsuValues'] {
       if (m.id === CURRENT_OMSU) {
         // текущее ОМСУ — часть показателей уже в разных статусах для демонстрации
         const demo: Record<string, OmsuValue> = {
-          i1: { value: 91.4, status: 'approved', updatedAt: '24.07.2026 11:20', signedBy: 'Иванова А.П. (ЭЦП)' },
-          i2: { value: 83.2, status: 'pending_cio', updatedAt: '25.07.2026 09:05', signedBy: 'Иванова А.П. (ЭЦП)' },
-          i3: { value: 77.6, status: 'returned', updatedAt: '25.07.2026 14:40', comment: 'Уточните методику: протяжённость по актам КОМОС отличается от паспорта дорог', signedBy: 'Иванова А.П. (ЭЦП)' },
-          i4: { value: 63.5, status: 'draft', updatedAt: '26.07.2026 10:12' },
+          i1: { value: 91.4, base: 90.0, target: 93.5, status: 'approved', updatedAt: '24.07.2026 11:20', signedBy: 'Иванова А.П. (ЭЦП)' },
+          i2: { value: 83.2, base: 82.0, target: 86.0, status: 'pending_cio', updatedAt: '25.07.2026 09:05', signedBy: 'Иванова А.П. (ЭЦП)' },
+          i3: { value: 77.6, base: 76.5, target: 80.0, status: 'returned', updatedAt: '25.07.2026 14:40', comment: 'Уточните методику: протяжённость по актам КОМОС отличается от паспорта дорог', signedBy: 'Иванова А.П. (ЭЦП)' },
+          i4: { value: 63.5, base: 62.8, target: 65.0, status: 'draft', updatedAt: '26.07.2026 10:12' },
         };
-        res[m.id][ind.id] = demo[ind.id] ?? { value: null, status: 'not_filled', updatedAt: null };
+        res[m.id][ind.id] = demo[ind.id] ?? { value: null, base: null, target: null, status: 'not_filled', updatedAt: null };
       } else {
         const st = STATUS_POOL[(mi * 3 + ii * 5) % STATUS_POOL.length];
+        const base = Math.round(v * 0.97 * 100) / 100;
+        const target = Math.round(v * 1.03 * 100) / 100;
         res[m.id][ind.id] = st === 'not_filled'
-          ? { value: null, status: st, updatedAt: null }
-          : { value: v, status: st, updatedAt: `${20 + ((mi + ii) % 6)}.07.2026 ${9 + (ii % 8)}:${10 + mi}` };
+          ? { value: null, base: null, target: null, status: st, updatedAt: null }
+          : { value: v, base, target, status: st, updatedAt: `${20 + ((mi + ii) % 6)}.07.2026 ${9 + (ii % 8)}:${10 + mi}` };
       }
     });
   });
@@ -134,12 +138,18 @@ function buildCioValues(): AppState['cioValues'] {
   INDICATORS.forEach((ind) => {
     res[ind.id] = {};
     if (ind.cioId === CURRENT_CIO) {
-      res[ind.id][ind.cioId] = { value: null, status: 'not_filled', updatedAt: null };
+      res[ind.id][ind.cioId] = { value: null, base: null, target: null, status: 'not_filled', updatedAt: null };
     } else {
       const [lo, hi] = RANGES[ind.id];
       const v = Math.round((lo + rnd() * (hi - lo)) * 100) / 100;
       const st: CioValue['status'] = rnd() > 0.5 ? 'approved' : 'pending_mef';
-      res[ind.id][ind.cioId] = { value: v, status: st, updatedAt: '23.07.2026 15:30' };
+      res[ind.id][ind.cioId] = {
+        value: v,
+        base: Math.round(v * 0.97 * 100) / 100,
+        target: Math.round(v * 1.03 * 100) / 100,
+        status: st,
+        updatedAt: '23.07.2026 15:30',
+      };
     }
   });
   return res;

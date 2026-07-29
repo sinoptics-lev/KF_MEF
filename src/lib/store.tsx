@@ -3,12 +3,12 @@ import type { AppState, Indicator, RoleId } from './types';
 import { INITIAL_STATE } from './data';
 
 export type Action =
-  | { type: 'OMSU_SET_VALUE'; munId: string; indId: string; value: number | null }
+  | { type: 'OMSU_SET_VALUE'; munId: string; indId: string; field: 'value' | 'base' | 'target'; value: number | null }
   | { type: 'OMSU_SIGN_SEND'; munId: string; indId: string; actor: string }
   | { type: 'OMSU_RECALL'; munId: string; indId: string; actor: string }
   | { type: 'CIO_APPROVE'; munId: string; indId: string; actor: string }
   | { type: 'CIO_RETURN'; munId: string; indId: string; actor: string; comment: string }
-  | { type: 'CIO_SET_OWN'; cioIndId: string; cioId: string; value: number | null }
+  | { type: 'CIO_SET_OWN'; cioIndId: string; cioId: string; field: 'value' | 'base' | 'target'; value: number | null }
   | { type: 'CIO_SIGN_OWN'; cioIndId: string; cioId: string; actor: string }
   | { type: 'CIO_RECALL_OWN'; cioIndId: string; cioId: string; actor: string }
   | { type: 'MEF_APPROVE'; cioIndId: string; cioId: string; actor: string }
@@ -34,14 +34,16 @@ function reducer(state: AppState, a: Action): AppState {
     case 'OMSU_SET_VALUE': {
       const cur = state.omsuValues[a.munId][a.indId];
       if (cur.status === 'approved' || cur.status === 'pending_cio') return state;
-      const status = a.value === null ? 'not_filled' : 'draft';
+      const next = { ...cur, [a.field]: a.value, updatedAt: now(), comment: undefined };
+      const hasAny = next.value !== null || (next.base ?? null) !== null || (next.target ?? null) !== null;
+      next.status = hasAny ? 'draft' : 'not_filled';
       return {
         ...state,
         omsuValues: {
           ...state.omsuValues,
           [a.munId]: {
             ...state.omsuValues[a.munId],
-            [a.indId]: { value: a.value, status, updatedAt: now(), comment: undefined },
+            [a.indId]: next,
           },
         },
       };
@@ -111,14 +113,17 @@ function reducer(state: AppState, a: Action): AppState {
     case 'CIO_SET_OWN': {
       const cur = state.cioValues[a.cioIndId]?.[a.cioId];
       if (cur && (cur.status === 'approved' || cur.status === 'pending_mef')) return state;
-      const status = a.value === null ? 'not_filled' : 'draft';
+      const base0 = cur ?? { value: null, base: null, target: null, status: 'not_filled' as const, updatedAt: null };
+      const next = { ...base0, [a.field]: a.value, updatedAt: now(), comment: undefined };
+      const hasAny = next.value !== null || (next.base ?? null) !== null || (next.target ?? null) !== null;
+      next.status = hasAny ? 'draft' : 'not_filled';
       return {
         ...state,
         cioValues: {
           ...state.cioValues,
           [a.cioIndId]: {
             ...(state.cioValues[a.cioIndId] ?? {}),
-            [a.cioId]: { value: a.value, status, updatedAt: now(), comment: undefined },
+            [a.cioId]: next,
           },
         },
       };
