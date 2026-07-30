@@ -53,20 +53,61 @@ export interface Indicator {
   formula: string;        // формула нормирования/расчёта
 }
 
-export interface OmsuValue {
-  value: number | null;    // факт (отчётный период)
-  base?: number | null;    // прогноз, базовый вариант
-  target?: number | null;  // прогноз, целевой вариант
+/** Набор заполняемых полей показателя: отчёт 2023–2025, оценка 2026, прогнозы 2027–2029 (2 варианта) */
+export const VALUE_FIELDS = [
+  { key: 'v2023', group: 'report', label: '2023' },
+  { key: 'v2024', group: 'report', label: '2024' },
+  { key: 'v2025', group: 'report', label: '2025' },
+  { key: 'v2026', group: 'estimate', label: '2026' },
+  { key: 'cons2027', group: 'y2027', label: 'Прогноз вариант 1 (консервативный)' },
+  { key: 'base2027', group: 'y2027', label: 'Прогноз вариант 2 (базовый)' },
+  { key: 'cons2028', group: 'y2028', label: 'Прогноз вариант 1 (консервативный)' },
+  { key: 'base2028', group: 'y2028', label: 'Прогноз вариант 2 (базовый)' },
+  { key: 'cons2029', group: 'y2029', label: 'Прогноз вариант 1 (консервативный)' },
+  { key: 'base2029', group: 'y2029', label: 'Прогноз вариант 2 (базовый)' },
+] as const;
+
+export type ValueFieldKey = (typeof VALUE_FIELDS)[number]['key'];
+
+/** Группы верхнего уровня шапки таблицы значений */
+export const VALUE_GROUPS = [
+  { key: 'report', label: 'Отчёт', span: 3 },
+  { key: 'estimate', label: 'Оценка', span: 1 },
+  { key: 'y2027', label: '2027', span: 2 },
+  { key: 'y2028', label: '2028', span: 2 },
+  { key: 'y2029', label: '2029', span: 2 },
+] as const;
+
+/** Пустой набор значений показателя */
+export function emptyValueFields(): Record<ValueFieldKey, null> {
+  return {
+    v2023: null, v2024: null, v2025: null, v2026: null,
+    cons2027: null, base2027: null, cons2028: null, base2028: null, cons2029: null, base2029: null,
+  };
+}
+
+/** Значения показателя по годам/вариантам */
+export interface IndicatorValues {
+  v2023: number | null;    // отчёт 2023
+  v2024: number | null;    // отчёт 2024
+  v2025: number | null;    // отчёт 2025
+  v2026: number | null;    // оценка 2026 (рейтинговый год)
+  cons2027: number | null; // 2027, вариант 1 (консервативный)
+  base2027: number | null; // 2027, вариант 2 (базовый)
+  cons2028: number | null; // 2028, вариант 1 (консервативный)
+  base2028: number | null; // 2028, вариант 2 (базовый)
+  cons2029: number | null; // 2029, вариант 1 (консервативный)
+  base2029: number | null; // 2029, вариант 2 (базовый)
+}
+
+export interface OmsuValue extends IndicatorValues {
   status: OmsuStatus;
   updatedAt: string | null;
   comment?: string;      // комментарий при возврате
   signedBy?: string;
 }
 
-export interface CioValue {
-  value: number | null;    // факт (отчётный период)
-  base?: number | null;    // прогноз, базовый вариант
-  target?: number | null;  // прогноз, целевой вариант
+export interface CioValue extends IndicatorValues {
   status: CioStatus;
   updatedAt: string | null;
   comment?: string;
