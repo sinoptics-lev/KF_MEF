@@ -1,12 +1,17 @@
-import type { ReactElement } from 'react';
 import { useStore } from '@/lib/store';
 import { MUNICIPALITIES, DIRECTIONS, CIOS, CURRENT_OMSU, CURRENT_CIO } from '@/lib/data';
-import type { RoleId } from '@/lib/types';
+import { VALUE_FIELDS, type RoleId } from '@/lib/types';
+import { ValueGroupHeader, fieldTint } from '@/components/ValueColumns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckCircle2, Circle, Clock, FileSignature, Info } from 'lucide-react';
+import { OmsuStatusBadge, CioStatusBadge } from '@/components/StatusBadge';
+import {
+  Tooltip, TooltipContent, TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { fmt } from '@/lib/rating';
+import { Info } from 'lucide-react';
 
 const STAGES: { n: number; actor: string; text: string }[] = [
   { n: 1, actor: 'МЭФ', text: 'Передаёт перечень показателей и формулы расчёта рейтинга на отчётный период. Каждый показатель привязан к отраслевому ЦИО' },
@@ -21,13 +26,21 @@ const STAGES: { n: number; actor: string; text: string }[] = [
   { n: 10, actor: 'Куратор МЭФ', text: 'Формирует предварительный рейтинг по введённым (согласованным и несогласованным) данным в любой момент сбора' },
 ];
 
-const STATUS_ICON: Record<string, ReactElement> = {
-  not_filled: <Circle className="h-4 w-4 text-gray-300" />,
-  draft: <Clock className="h-4 w-4 text-blue-500" />,
-  pending_cio: <FileSignature className="h-4 w-4 text-amber-500" />,
-  approved: <CheckCircle2 className="h-4 w-4 text-green-600" />,
-  returned: <Circle className="h-4 w-4 text-red-500 fill-red-100" />,
-};
+/** Значение показателя в мониторинге: при наведении — дата внесения и ФИО внёсшего */
+function MonitorValue({ value, updatedAt, author }: { value: number | null; updatedAt: string | null; author: string }) {
+  if (value === null || value === undefined) return <span className="text-muted-foreground">—</span>;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="cursor-help border-b border-dotted border-slate-400">{fmt(value)}</span>
+      </TooltipTrigger>
+      <TooltipContent side="top" sideOffset={4} className="text-xs leading-relaxed">
+        <div><span className="opacity-60">Дата внесения:</span> {updatedAt ?? '—'}</div>
+        <div><span className="opacity-60">Внёс данные:</span> {author}</div>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 const CAMPAIGN_BADGE: Record<string, { label: string; cls: string }> = {
   draft: { label: 'Подготовка', cls: 'bg-gray-100 text-gray-700' },
@@ -157,10 +170,10 @@ export function Overview({ role }: { role: RoleId }) {
         </Card>
       </div>
 
-      <Tabs defaultValue="stages">
+      <Tabs defaultValue="monitor">
         <TabsList>
-          <TabsTrigger value="stages">Этапы процесса</TabsTrigger>
           <TabsTrigger value="monitor">Мониторинг наполняемости</TabsTrigger>
+          <TabsTrigger value="stages">Этапы процесса</TabsTrigger>
           <TabsTrigger value="history">Журнал событий</TabsTrigger>
         </TabsList>
 
@@ -184,57 +197,83 @@ export function Overview({ role }: { role: RoleId }) {
           </Card>
         </TabsContent>
 
-        <TabsContent value="monitor">
-          <Card>
-            <CardContent className="pt-4 overflow-x-auto">
-              <table className="w-full text-xs border-collapse">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-2 font-medium sticky left-0 bg-white min-w-[160px]">ОМСУ / показатель</th>
-                    {scopeInds.map((ind) => (
-                      <th key={ind.id} className="p-2 font-medium text-center" title={ind.name}>{ind.num}</th>
-                    ))}
-                    <th className="p-2 font-medium text-center">Готовность</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {scopeMuns.map((m) => {
-                    const vals = scopeInds.map((ind) => state.omsuValues[m.id]?.[ind.id]);
-                    const appr = vals.filter((v) => v?.status === 'approved').length;
-                    const ready = Math.round((appr / scopeInds.length) * 100);
+        <TabsContent value="monitor" className="space-y-4">
+          <div className="rounded-md border border-blue-200 bg-blue-50 p-2.5 text-xs text-blue-900 flex gap-2 items-center">
+            <Info className="h-4 w-4 shrink-0" />
+            По каждому показателю отображаются курирующий ЦИО (с собственным значением) и все ОМСУ с введёнными данными и статусом согласования.
+            Наведите курсор на значение, чтобы увидеть дату внесения и ФИО внёсшего данные.
+          </div>
+          {DIRECTIONS.map((d) => {
+            const inds = scopeInds.filter((i) => i.directionId === d.id);
+            if (!inds.length) return null;
+            return (
+              <Card key={d.id}>
+                <CardHeader className="py-3">
+                  <CardTitle className="text-base">{d.name}</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0 space-y-4">
+                  {inds.map((ind) => {
+                    const cio = CIOS.find((c) => c.id === ind.cioId);
+                    const cioV = state.cioValues[ind.id]?.[ind.cioId];
                     return (
-                      <tr key={m.id} className="border-b hover:bg-slate-50">
-                        <td className="p-2 font-medium sticky left-0 bg-white">{m.name}</td>
-                        {scopeInds.map((ind) => {
-                          const v = state.omsuValues[m.id]?.[ind.id];
-                          return (
-                            <td key={ind.id} className="p-2 text-center" title={`${ind.name}: ${v?.status ?? 'not_filled'}`}>
-                              <span className="inline-flex">{STATUS_ICON[v?.status ?? 'not_filled']}</span>
-                            </td>
-                          );
-                        })}
-                        <td className="p-2 text-center">
-                          <div className="flex items-center gap-1 justify-center">
-                            <div className="w-16 h-1.5 rounded bg-slate-100 overflow-hidden">
-                              <div className="h-full bg-green-500" style={{ width: `${ready}%` }} />
-                            </div>
-                            <span className="text-muted-foreground">{ready}%</span>
+                      <div key={ind.id} className="rounded-md border">
+                        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b bg-slate-50/70">
+                          <div className="font-medium text-sm">
+                            {ind.num}. {ind.name} <span className="font-normal text-muted-foreground">({ind.unit})</span>
                           </div>
-                        </td>
-                      </tr>
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="text-muted-foreground">Курирующий ЦИО:</span>
+                            <Badge variant="secondary">{cio?.short}</Badge>
+                            <span className="text-muted-foreground hidden md:inline">{cio?.name}</span>
+                          </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm border-collapse">
+                            <thead>
+                              <ValueGroupHeader
+                                leading={<th rowSpan={2} className="text-left p-2 align-middle min-w-[140px]">Участник</th>}
+                                trailing={<th rowSpan={2} className="text-left p-2 align-middle border-l">Статус согласования</th>}
+                              />
+                            </thead>
+                            <tbody>
+                              {/* Курирующий ЦИО — собственное значение */}
+                              <tr className="border-b bg-violet-50/40">
+                                <td className="p-2">
+                                  <div className="font-medium">{cio?.short} <span className="text-xs font-normal text-violet-700">(собственное значение ЦИО)</span></div>
+                                </td>
+                                {VALUE_FIELDS.map((f) => (
+                                  <td key={f.key} className={`p-1.5 text-center ${f.key === 'v2026' ? 'font-medium' : ''}`}>
+                                    <MonitorValue value={cioV?.[f.key] ?? null} updatedAt={cioV?.updatedAt ?? null} author={cioV?.signedBy ?? 'Петров С.И.'} />
+                                  </td>
+                                ))}
+                                <td className="p-2">{cioV && <CioStatusBadge status={cioV.status} />}</td>
+                              </tr>
+                              {/* ОМСУ */}
+                              {scopeMuns.map((m) => {
+                                const v = state.omsuValues[m.id]?.[ind.id];
+                                if (!v) return null;
+                                return (
+                                  <tr key={m.id} className="border-b last:border-0 hover:bg-slate-50">
+                                    <td className="p-2">{m.name}</td>
+                                    {VALUE_FIELDS.map((f) => (
+                                      <td key={f.key} className={`p-1.5 text-center ${f.key === 'v2026' ? 'font-medium' : ''} ${fieldTint(f.key)}`}>
+                                        <MonitorValue value={v[f.key]} updatedAt={v.updatedAt} author={v.signedBy ?? 'Иванова А.П.'} />
+                                      </td>
+                                    ))}
+                                    <td className="p-2"><OmsuStatusBadge status={v.status} /></td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
                     );
                   })}
-                </tbody>
-              </table>
-              <div className="flex flex-wrap gap-4 mt-3 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">{STATUS_ICON.not_filled} не заполнен</span>
-                <span className="flex items-center gap-1">{STATUS_ICON.draft} черновик</span>
-                <span className="flex items-center gap-1">{STATUS_ICON.pending_cio} на согласовании у ЦИО</span>
-                <span className="flex items-center gap-1">{STATUS_ICON.approved} согласован</span>
-                <span className="flex items-center gap-1">{STATUS_ICON.returned} возвращён</span>
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            );
+          })}
         </TabsContent>
 
         <TabsContent value="history">
