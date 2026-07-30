@@ -9,13 +9,31 @@ import { CioWorkspace } from '@/pages/CioWorkspace';
 import { MefWorkspace } from '@/pages/MefWorkspace';
 import { RatingView } from '@/pages/RatingView';
 import { Description } from '@/pages/Description';
+import { Home } from '@/pages/Home';
+import type { ModuleId } from '@/pages/Home';
+import { ModuleStub } from '@/pages/ModuleStub';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Bell, Landmark, UserRound, BookOpen } from 'lucide-react';
+import { Bell, Landmark, UserRound, BookOpen, Home as HomeIcon } from 'lucide-react';
 
 type PageId = 'overview' | 'setup' | 'omsu' | 'cio' | 'mef' | 'rating' | 'about';
+type BlockId = 'mun' | 'obl' | 'params' | 'form2p';
+
+const BLOCK_LABELS: Record<BlockId, string> = {
+  mun: 'Муниципальный прогноз',
+  obl: 'Областной прогноз',
+  params: 'Параметры СЭР',
+  form2p: 'Форма 2П',
+};
+
+const BLOCKS: Record<RoleId, BlockId[]> = {
+  admin: ['mun', 'obl', 'params', 'form2p'],
+  mef: ['mun', 'obl', 'params', 'form2p'],
+  cio: ['mun', 'obl', 'params', 'form2p'],
+  omsu: ['mun'],
+};
 
 const NAV: Record<RoleId, { id: PageId; label: string }[]> = {
   admin: [
@@ -43,23 +61,35 @@ const DEFAULT_PAGE: Record<RoleId, PageId> = {
   omsu: 'omsu',
 };
 
-function Shell() {
+const STUB_TITLES: Record<Exclude<ModuleId, 'ser'>, string> = {
+  rating: 'Формирование Рейтинга ОМСУ',
+  ukaz: 'Контроль исполнения Указа Президента РФ №607',
+};
+
+function Shell({ onHome }: { onHome: () => void }) {
   const { state } = useStore();
   const [role, setRole] = useState<RoleId>('admin');
   const [page, setPage] = useState<PageId>('setup');
+  const [block, setBlock] = useState<BlockId>('mun');
 
   const roleInfo = ROLES.find((r) => r.id === role)!;
   const notifs = state.notifications.filter((n) => n.forRoles.includes(role)).slice(-8).reverse();
 
   const switchRole = (r: RoleId) => {
     setRole(r);
+    setBlock(BLOCKS[r][0]);
     setPage(DEFAULT_PAGE[r]);
+  };
+
+  const switchBlock = (b: BlockId) => {
+    setBlock(b);
+    setPage(DEFAULT_PAGE[role]);
   };
 
   return (
     <div className="min-h-screen bg-slate-100">
       {/* Шапка в стиле ГАС "Управление" МО */}
-      <header className="bg-gradient-to-r from-[#1e5c8f] via-[#2a6ea6] to-[#3a83bd] text-white shadow">
+      <header className="sticky top-0 z-50 bg-gradient-to-r from-[#1e5c8f] via-[#2a6ea6] to-[#3a83bd] text-white shadow">
         <div className="w-full px-4 py-3 flex items-center gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/15 shrink-0">
@@ -70,12 +100,20 @@ function Shell() {
                 ГАС «Управление» МО · Конструктор форм
               </div>
               <div className="text-xs text-white/80">
-                Прототип модуля «Формирование рейтинга ОМСУ» · служба техподдержки: support.mosreg.ru
+                Модуль «Прогноз СЭР МО» · служба техподдержки: support.mosreg.ru
               </div>
             </div>
           </div>
 
           <div className="ml-auto flex items-center gap-3">
+            <button
+              onClick={onHome}
+              title="К списку модулей"
+              className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors bg-white/15 hover:bg-white/25 text-white"
+            >
+              <HomeIcon className="h-4 w-4" />
+              К списку модулей
+            </button>
             <button
               onClick={() => setPage('about')}
               className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
@@ -128,8 +166,27 @@ function Shell() {
           </div>
         </div>
 
-        {/* Навигация */}
+        {/* Блоки модуля */}
         <div className="bg-[#16486f]/60">
+          <div className="w-full px-4 flex gap-1">
+            {BLOCKS[role].map((b) => (
+              <button
+                key={b}
+                onClick={() => switchBlock(b)}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  block === b
+                    ? 'border-white text-white'
+                    : 'border-transparent text-white/70 hover:text-white'
+                }`}
+              >
+                {BLOCK_LABELS[b]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Вкладки активного блока */}
+        <div className="bg-white border-b border-slate-200">
           <div className="w-full px-4 flex gap-1">
             {NAV[role].map((item) => (
               <button
@@ -137,8 +194,8 @@ function Shell() {
                 onClick={() => setPage(item.id)}
                 className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                   page === item.id
-                    ? 'border-white text-white'
-                    : 'border-transparent text-white/70 hover:text-white'
+                    ? 'border-[#1e5c8f] text-[#1e5c8f]'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
                 {item.label}
@@ -152,6 +209,7 @@ function Shell() {
       <div className="w-full px-4 py-2">
         <div className="rounded-md bg-white border px-3 py-2 text-xs text-muted-foreground flex flex-wrap gap-x-4">
           <span><b className="text-slate-700">{roleInfo.name}</b> · {roleInfo.org}</span>
+          <span>Блок: <b className="text-slate-700">{BLOCK_LABELS[block]}</b></span>
           <span>{roleInfo.description}</span>
         </div>
       </div>
@@ -168,7 +226,7 @@ function Shell() {
 
       <footer className="border-t bg-white py-3">
         <div className="w-full px-4 text-xs text-muted-foreground">
-          Прототип доработки ИС «Конструктор форм» — модуль формирования рейтинга ОМСУ. Данные демонстрационные.
+          Прототип доработки ИС «Конструктор форм» — модуль «Прогноз СЭР МО». Данные демонстрационные.
         </div>
       </footer>
     </div>
@@ -176,9 +234,23 @@ function Shell() {
 }
 
 export default function App() {
+  const [view, setView] = useState<'home' | 'app' | 'stub'>('home');
+  const [stubModule, setStubModule] = useState<Exclude<ModuleId, 'ser'>>('rating');
+
+  const openModule = (m: ModuleId) => {
+    if (m === 'ser') {
+      setView('app');
+    } else {
+      setStubModule(m);
+      setView('stub');
+    }
+  };
+
   return (
     <StoreProvider>
-      <Shell />
+      {view === 'home' && <Home onOpen={openModule} />}
+      {view === 'stub' && <ModuleStub title={STUB_TITLES[stubModule]} onBack={() => setView('home')} />}
+      {view === 'app' && <Shell onHome={() => setView('home')} />}
     </StoreProvider>
   );
 }
