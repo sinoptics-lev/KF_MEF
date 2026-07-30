@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useStore } from '@/lib/store';
 import { DIRECTIONS, CIOS, CURRENT_OMSU, MUNICIPALITIES } from '@/lib/data';
 import { VALUE_FIELDS } from '@/lib/types';
+import { EMPTY_TREE_FILTER, chevronParents, visibleTree, type TreeFilter } from '@/lib/indTree';
+import { IndToolbar, TreeToggle } from '@/components/IndToolbar';
 import { OmsuStatusBadge, CioStatusBadge } from '@/components/StatusBadge';
 import { ValueGroupHeader, fieldTint } from '@/components/ValueColumns';
 import { ValueTip, WithValueTip } from '@/components/ValueTip';
@@ -41,11 +43,18 @@ export function OmsuForm() {
   const [openDir, setOpenDir] = useState<string | null>(DIRECTIONS[0]?.id ?? null);
   // показатель, по которому открыто модальное окно со значениями всех ОМСУ
   const [compareInd, setCompareInd] = useState<string | null>(null);
+  // дерево показателей: сворачивание дочерних и фильтры
+  const [treeFilter, setTreeFilter] = useState<TreeFilter>(EMPTY_TREE_FILTER);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const visible = visibleTree(state.indicators, collapsed, treeFilter);
+  const parents = chevronParents(state.indicators, treeFilter);
+  const toggleNode = (id: string) => setCollapsed((p) => ({ ...p, [id]: !p[id] }));
 
   const values = state.omsuValues[munId];
-  const total = state.indicators.length;
-  const approved = state.indicators.filter((i) => values[i.id]?.status === 'approved').length;
-  const pending = state.indicators.filter((i) => values[i.id]?.status === 'pending_cio').length;
+  const fillable = state.indicators.filter((i) => !i.isGroup);
+  const total = fillable.length;
+  const approved = fillable.filter((i) => values[i.id]?.status === 'approved').length;
+  const pending = fillable.filter((i) => values[i.id]?.status === 'pending_cio').length;
 
   const cmpInd = state.indicators.find((i) => i.id === compareInd) ?? null;
 
@@ -74,10 +83,17 @@ export function OmsuForm() {
         </span>
       </div>
 
+      <IndToolbar
+        filter={treeFilter}
+        onChange={setTreeFilter}
+        shown={visible.length}
+        total={state.indicators.length}
+      />
+
       {DIRECTIONS.map((d) => {
-        const inds = state.indicators.filter((i) => i.directionId === d.id);
+        const inds = visible.filter((i) => i.directionId === d.id);
         if (!inds.length) return null;
-        const st = dirStats(inds, values);
+        const st = dirStats(state.indicators.filter((i) => i.directionId === d.id && !i.isGroup), values);
         const open = openDir === d.id;
         return (
           <Card key={d.id}>
@@ -131,13 +147,43 @@ export function OmsuForm() {
                   </thead>
                   <tbody>
                     {inds.map((ind) => {
+                      if (ind.isGroup) {
+                        return (
+                          <tr key={ind.id} className="border-b bg-slate-50/80">
+                            <td className="p-2 text-muted-foreground whitespace-nowrap align-middle">{ind.num}</td>
+                            <td colSpan={3 + VALUE_FIELDS.length + 2} className="p-2 align-middle">
+                              <span
+                                className="flex items-center gap-1 font-semibold text-slate-700"
+                                style={{ paddingLeft: `${(ind.level - 1) * 18}px` }}
+                              >
+                                <TreeToggle
+                                  hasChildren={parents.has(ind.id)}
+                                  collapsed={!!collapsed[ind.id]}
+                                  onToggle={() => toggleNode(ind.id)}
+                                />
+                                <span>
+                                  <span className="mr-1 text-slate-400">▸</span>
+                                  {ind.name}
+                                </span>
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      }
                       const v = values[ind.id];
                       const editable = v.status === 'not_filled' || v.status === 'draft' || v.status === 'returned';
                       return (
                         <tr key={ind.id} className="border-b hover:bg-slate-50 align-top">
-                          <td className="p-2 text-muted-foreground">{ind.num}</td>
+                          <td className="p-2 text-muted-foreground whitespace-nowrap">{ind.num}</td>
                           <td className="p-2">
-                            <div className="flex items-start gap-1.5">
+                            <div className="flex items-start gap-1.5" style={{ paddingLeft: `${(ind.level - 1) * 18}px` }}>
+                              <span className="mt-0.5 inline-flex shrink-0">
+                                <TreeToggle
+                                  hasChildren={parents.has(ind.id)}
+                                  collapsed={!!collapsed[ind.id]}
+                                  onToggle={() => toggleNode(ind.id)}
+                                />
+                              </span>
                               <TooltipProvider delayDuration={150}>
                                 <Tooltip>
                                   <TooltipTrigger asChild>

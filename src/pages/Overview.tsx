@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useStore } from '@/lib/store';
 import { MUNICIPALITIES, DIRECTIONS, CIOS, CURRENT_OMSU, CURRENT_CIO } from '@/lib/data';
 import { VALUE_FIELDS, type RoleId } from '@/lib/types';
+import { EMPTY_TREE_FILTER, chevronParents, visibleTree, type TreeFilter } from '@/lib/indTree';
+import { IndToolbar, TreeToggle } from '@/components/IndToolbar';
 import { ValueGroupHeader, fieldTint } from '@/components/ValueColumns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -54,10 +56,18 @@ export function Overview({ role }: { role: RoleId }) {
   const scopeInds = role === 'cio' ? state.indicators.filter((i) => i.cioId === CURRENT_CIO) : state.indicators;
   const scoped = role === 'omsu' || role === 'cio';
 
-  // Статистика по области видимости
+  // дерево показателей: сворачивание дочерних и фильтры
+  const [treeFilter, setTreeFilter] = useState<TreeFilter>(EMPTY_TREE_FILTER);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const scopeVisible = visibleTree(scopeInds, collapsed, treeFilter);
+  const parents = chevronParents(state.indicators, treeFilter);
+  const toggleNode = (id: string) => setCollapsed((p) => ({ ...p, [id]: !p[id] }));
+
+  // Статистика по области видимости (только заполняемые показатели, без групп)
+  const scopeFill = scopeInds.filter((i) => !i.isGroup);
   let total = 0, approved = 0, pending = 0, returned = 0, draft = 0, empty = 0;
   scopeMuns.forEach((m) => {
-    scopeInds.forEach((ind) => {
+    scopeFill.forEach((ind) => {
       const v = state.omsuValues[m.id]?.[ind.id];
       total += 1;
       if (!v || v.status === 'not_filled') empty += 1;
@@ -142,7 +152,7 @@ export function Overview({ role }: { role: RoleId }) {
             {role === 'omsu' && (
               <>
                 <div className="flex justify-between"><span className="text-muted-foreground">ОМСУ</span><span className="font-medium">{scopeMuns[0]?.name}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Показатели к заполнению</span><span className="font-medium">{scopeInds.length}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Показатели к заполнению</span><span className="font-medium">{scopeFill.length}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Направления</span><span className="font-medium">{DIRECTIONS.length}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Согласующие ЦИО</span><span className="font-medium">{CIOS.length}</span></div>
               </>
@@ -150,7 +160,7 @@ export function Overview({ role }: { role: RoleId }) {
             {role === 'cio' && (
               <>
                 <div className="flex justify-between"><span className="text-muted-foreground">Отраслевой ЦИО</span><span className="font-medium">{CIOS.find((c) => c.id === CURRENT_CIO)?.short}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Показатели отрасли</span><span className="font-medium">{scopeInds.length}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Показатели отрасли</span><span className="font-medium">{scopeFill.length}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">ОМСУ на согласовании</span><span className="font-medium">{MUNICIPALITIES.length}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Срок согласования</span><span className="font-medium">{state.campaign.deadlineCio.split('-').reverse().join('.')}</span></div>
               </>
@@ -160,7 +170,7 @@ export function Overview({ role }: { role: RoleId }) {
                 <div className="flex justify-between"><span className="text-muted-foreground">ОМСУ</span><span className="font-medium">{MUNICIPALITIES.length}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Отраслевые ЦИО</span><span className="font-medium">{CIOS.length}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Направления</span><span className="font-medium">{DIRECTIONS.length}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Показатели ОМСУ</span><span className="font-medium">{state.indicators.length}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Показатели ОМСУ</span><span className="font-medium">{state.indicators.filter((i) => !i.isGroup).length}</span></div>
               </>
             )}
           </CardContent>
@@ -195,6 +205,12 @@ export function Overview({ role }: { role: RoleId }) {
         </TabsContent>
 
         <TabsContent value="monitor" className="space-y-4">
+          <IndToolbar
+            filter={treeFilter}
+            onChange={setTreeFilter}
+            shown={scopeVisible.length}
+            total={scopeInds.length}
+          />
           <div className="rounded-md border border-blue-200 bg-blue-50 p-2.5 text-xs text-blue-900 flex gap-2 items-center">
             <Info className="h-4 w-4 shrink-0" />
             <span className="flex-1">
@@ -217,7 +233,7 @@ export function Overview({ role }: { role: RoleId }) {
             </span>
           </div>
           {DIRECTIONS.map((d) => {
-            const inds = scopeInds.filter((i) => i.directionId === d.id);
+            const inds = scopeVisible.filter((i) => i.directionId === d.id);
             if (!inds.length) return null;
             const dOpen = dirOpen(d.id);
             return (
@@ -230,13 +246,32 @@ export function Overview({ role }: { role: RoleId }) {
                     {dOpen ? <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" /> : <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" />}
                     <CardTitle className="text-base flex-1">{d.name}</CardTitle>
                     <span className="text-xs font-normal text-muted-foreground">
-                      Показателей: {inds.length}
+                      Показателей: {inds.filter((i) => !i.isGroup).length}
                     </span>
                   </button>
                 </CardHeader>
                 {dOpen && (
                 <CardContent className="pt-0 space-y-4">
                   {inds.map((ind) => {
+                    if (ind.isGroup) {
+                      return (
+                        <div
+                          key={ind.id}
+                          className="flex items-center gap-1 px-3 py-1.5 text-sm font-semibold text-slate-700 bg-slate-50/80 rounded-md border"
+                          style={{ marginLeft: `${(ind.level - 1) * 20}px` }}
+                        >
+                          <TreeToggle
+                            hasChildren={parents.has(ind.id)}
+                            collapsed={!!collapsed[ind.id]}
+                            onToggle={() => toggleNode(ind.id)}
+                          />
+                          <span>
+                            <span className="mr-1 text-slate-400">▸</span>
+                            {ind.num}. {ind.name}
+                          </span>
+                        </div>
+                      );
+                    }
                     const cio = CIOS.find((c) => c.id === ind.cioId);
                     const cioV = state.cioValues[ind.id]?.[ind.cioId];
                     const iOpen = indOpen(ind.id);
@@ -245,12 +280,17 @@ export function Overview({ role }: { role: RoleId }) {
                       .filter((v) => v && v.status !== 'not_filled');
                     const apprCnt = indVals.filter((v) => v!.status === 'approved').length;
                     return (
-                      <div key={ind.id} className="rounded-md border">
+                      <div key={ind.id} className="rounded-md border" style={{ marginLeft: `${(ind.level - 1) * 20}px` }}>
                         <button
                           onClick={() => setOpenInds((p) => ({ ...p, [ind.id]: !iOpen }))}
                           className="flex w-full flex-wrap items-center justify-between gap-2 px-3 py-2 text-left border-b bg-slate-50/70 hover:bg-slate-100/70"
                         >
                           <div className="font-medium text-sm flex items-center gap-2 min-w-0">
+                            <TreeToggle
+                              hasChildren={parents.has(ind.id)}
+                              collapsed={!!collapsed[ind.id]}
+                              onToggle={() => toggleNode(ind.id)}
+                            />
                             {iOpen ? <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" /> : <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" />}
                             <span className="truncate">
                               {ind.num}. {ind.name} <span className="font-normal text-muted-foreground">({ind.unit})</span>
