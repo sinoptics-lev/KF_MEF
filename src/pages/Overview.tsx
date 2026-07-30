@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useStore } from '@/lib/store';
 import { MUNICIPALITIES, DIRECTIONS, CIOS, CURRENT_OMSU, CURRENT_CIO } from '@/lib/data';
 import { VALUE_FIELDS, type RoleId } from '@/lib/types';
@@ -7,11 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OmsuStatusBadge, CioStatusBadge } from '@/components/StatusBadge';
-import {
-  Tooltip, TooltipContent, TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { fmt } from '@/lib/rating';
-import { Info } from 'lucide-react';
+import { ValueTip } from '@/components/ValueTip';
+import { Info, ChevronDown, ChevronRight } from 'lucide-react';
 
 const STAGES: { n: number; actor: string; text: string }[] = [
   { n: 1, actor: 'МЭФ', text: 'Передаёт перечень показателей и формулы расчёта рейтинга на отчётный период. Каждый показатель привязан к отраслевому ЦИО' },
@@ -26,22 +24,6 @@ const STAGES: { n: number; actor: string; text: string }[] = [
   { n: 10, actor: 'Куратор МЭФ', text: 'Формирует предварительный рейтинг по введённым (согласованным и несогласованным) данным в любой момент сбора' },
 ];
 
-/** Значение показателя в мониторинге: при наведении — дата внесения и ФИО внёсшего */
-function MonitorValue({ value, updatedAt, author }: { value: number | null; updatedAt: string | null; author: string }) {
-  if (value === null || value === undefined) return <span className="text-muted-foreground">—</span>;
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className="cursor-help border-b border-dotted border-slate-400">{fmt(value)}</span>
-      </TooltipTrigger>
-      <TooltipContent side="top" sideOffset={4} className="text-xs leading-relaxed">
-        <div><span className="opacity-60">Дата внесения:</span> {updatedAt ?? '—'}</div>
-        <div><span className="opacity-60">Внёс данные:</span> {author}</div>
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
 const CAMPAIGN_BADGE: Record<string, { label: string; cls: string }> = {
   draft: { label: 'Подготовка', cls: 'bg-gray-100 text-gray-700' },
   scheduled: { label: 'Запланирован', cls: 'bg-blue-100 text-blue-700' },
@@ -51,6 +33,21 @@ const CAMPAIGN_BADGE: Record<string, { label: string; cls: string }> = {
 
 export function Overview({ role }: { role: RoleId }) {
   const { state } = useStore();
+
+  // Сворачивание мониторинга: сферы (по умолчанию развёрнуты) и показатели
+  // (для МЭФ по умолчанию свёрнуты — объём данных большой)
+  const [openDirs, setOpenDirs] = useState<Record<string, boolean>>({});
+  const [openInds, setOpenInds] = useState<Record<string, boolean>>({});
+  const dirOpen = (id: string) => openDirs[id] ?? true;
+  const indOpen = (id: string) => openInds[id] ?? (role !== 'mef');
+  const setAll = (open: boolean) => {
+    const nd: Record<string, boolean> = {};
+    DIRECTIONS.forEach((d) => { nd[d.id] = open; });
+    setOpenDirs(nd);
+    const ni: Record<string, boolean> = {};
+    state.indicators.forEach((i) => { ni[i.id] = open; });
+    setOpenInds(ni);
+  };
 
   // Область видимости: ОМСУ — только своё ОМСУ; ЦИО — только показатели своей отрасли
   const scopeMuns = role === 'omsu' ? MUNICIPALITIES.filter((m) => m.id === CURRENT_OMSU) : MUNICIPALITIES;
@@ -200,33 +197,73 @@ export function Overview({ role }: { role: RoleId }) {
         <TabsContent value="monitor" className="space-y-4">
           <div className="rounded-md border border-blue-200 bg-blue-50 p-2.5 text-xs text-blue-900 flex gap-2 items-center">
             <Info className="h-4 w-4 shrink-0" />
-            По каждому показателю отображаются курирующий ЦИО (с собственным значением) и все ОМСУ с введёнными данными и статусом согласования.
-            Наведите курсор на значение, чтобы увидеть дату внесения и ФИО внёсшего данные.
+            <span className="flex-1">
+              По каждому показателю отображаются курирующий ЦИО (с собственным значением) и все ОМСУ с введёнными данными и статусом согласования.
+              Наведите курсор на значение, чтобы увидеть дату внесения и ФИО внёсшего данные.
+            </span>
+            <span className="flex shrink-0 gap-1">
+              <button
+                onClick={() => setAll(true)}
+                className="rounded border border-blue-300 bg-white px-2 py-1 font-medium text-blue-800 hover:bg-blue-100"
+              >
+                Развернуть всё
+              </button>
+              <button
+                onClick={() => setAll(false)}
+                className="rounded border border-blue-300 bg-white px-2 py-1 font-medium text-blue-800 hover:bg-blue-100"
+              >
+                Свернуть всё
+              </button>
+            </span>
           </div>
           {DIRECTIONS.map((d) => {
             const inds = scopeInds.filter((i) => i.directionId === d.id);
             if (!inds.length) return null;
+            const dOpen = dirOpen(d.id);
             return (
               <Card key={d.id}>
                 <CardHeader className="py-3">
-                  <CardTitle className="text-base">{d.name}</CardTitle>
+                  <button
+                    onClick={() => setOpenDirs((p) => ({ ...p, [d.id]: !dOpen }))}
+                    className="flex w-full items-center gap-2 text-left"
+                  >
+                    {dOpen ? <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" /> : <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" />}
+                    <CardTitle className="text-base flex-1">{d.name}</CardTitle>
+                    <span className="text-xs font-normal text-muted-foreground">
+                      Показателей: {inds.length}
+                    </span>
+                  </button>
                 </CardHeader>
+                {dOpen && (
                 <CardContent className="pt-0 space-y-4">
                   {inds.map((ind) => {
                     const cio = CIOS.find((c) => c.id === ind.cioId);
                     const cioV = state.cioValues[ind.id]?.[ind.cioId];
+                    const iOpen = indOpen(ind.id);
+                    const indVals = scopeMuns
+                      .map((m) => state.omsuValues[m.id]?.[ind.id])
+                      .filter((v) => v && v.status !== 'not_filled');
+                    const apprCnt = indVals.filter((v) => v!.status === 'approved').length;
                     return (
                       <div key={ind.id} className="rounded-md border">
-                        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b bg-slate-50/70">
-                          <div className="font-medium text-sm">
-                            {ind.num}. {ind.name} <span className="font-normal text-muted-foreground">({ind.unit})</span>
+                        <button
+                          onClick={() => setOpenInds((p) => ({ ...p, [ind.id]: !iOpen }))}
+                          className="flex w-full flex-wrap items-center justify-between gap-2 px-3 py-2 text-left border-b bg-slate-50/70 hover:bg-slate-100/70"
+                        >
+                          <div className="font-medium text-sm flex items-center gap-2 min-w-0">
+                            {iOpen ? <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" /> : <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" />}
+                            <span className="truncate">
+                              {ind.num}. {ind.name} <span className="font-normal text-muted-foreground">({ind.unit})</span>
+                            </span>
                           </div>
                           <div className="flex items-center gap-2 text-xs">
+                            <span className="text-muted-foreground">Согласовано: {apprCnt} из {indVals.length}</span>
                             <span className="text-muted-foreground">Курирующий ЦИО:</span>
                             <Badge variant="secondary">{cio?.short}</Badge>
                             <span className="text-muted-foreground hidden md:inline">{cio?.name}</span>
                           </div>
-                        </div>
+                        </button>
+                        {iOpen && (
                         <div className="overflow-x-auto">
                           <table className="w-full text-sm border-collapse">
                             <thead>
@@ -243,7 +280,7 @@ export function Overview({ role }: { role: RoleId }) {
                                 </td>
                                 {VALUE_FIELDS.map((f) => (
                                   <td key={f.key} className={`p-1.5 text-center ${f.key === 'v2026' ? 'font-medium' : ''}`}>
-                                    <MonitorValue value={cioV?.[f.key] ?? null} updatedAt={cioV?.updatedAt ?? null} author={cioV?.signedBy ?? 'Петров С.И.'} />
+                                    <ValueTip value={cioV?.[f.key] ?? null} updatedAt={cioV?.updatedAt ?? null} author={cioV?.signedBy ?? 'Петров С.И.'} />
                                   </td>
                                 ))}
                                 <td className="p-2">{cioV && <CioStatusBadge status={cioV.status} />}</td>
@@ -257,7 +294,7 @@ export function Overview({ role }: { role: RoleId }) {
                                     <td className="p-2">{m.name}</td>
                                     {VALUE_FIELDS.map((f) => (
                                       <td key={f.key} className={`p-1.5 text-center ${f.key === 'v2026' ? 'font-medium' : ''} ${fieldTint(f.key)}`}>
-                                        <MonitorValue value={v[f.key]} updatedAt={v.updatedAt} author={v.signedBy ?? 'Иванова А.П.'} />
+                                        <ValueTip value={v[f.key]} updatedAt={v.updatedAt} author={v.signedBy ?? 'Иванова А.П.'} />
                                       </td>
                                     ))}
                                     <td className="p-2"><OmsuStatusBadge status={v.status} /></td>
@@ -267,10 +304,12 @@ export function Overview({ role }: { role: RoleId }) {
                             </tbody>
                           </table>
                         </div>
+                        )}
                       </div>
                     );
                   })}
                 </CardContent>
+                )}
               </Card>
             );
           })}
