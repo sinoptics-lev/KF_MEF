@@ -1,3 +1,4 @@
+import { emptyValueFields } from './types';
 import type {
   Role, Direction, Cio, Municipality, Indicator,
   OmsuValue, CioValue, AppState,
@@ -101,6 +102,18 @@ const STATUS_POOL: OmsuValue['status'][] = [
   'approved', 'approved', 'approved', 'pending_cio', 'pending_cio', 'draft', 'not_filled',
 ];
 
+const r2 = (x: number) => Math.round(x * 100) / 100;
+
+/** Значения по всем годам/вариантам на основе оценки 2026 */
+function makeFields(v2026: number) {
+  return {
+    v2023: r2(v2026 * 0.94), v2024: r2(v2026 * 0.97), v2025: r2(v2026 * 0.99), v2026: r2(v2026),
+    cons2027: r2(v2026 * 1.0), base2027: r2(v2026 * 1.02),
+    cons2028: r2(v2026 * 1.01), base2028: r2(v2026 * 1.04),
+    cons2029: r2(v2026 * 1.02), base2029: r2(v2026 * 1.06),
+  };
+}
+
 function buildOmsuValues(): AppState['omsuValues'] {
   const res: AppState['omsuValues'] = {};
   const rnd = seedRand(42);
@@ -112,19 +125,17 @@ function buildOmsuValues(): AppState['omsuValues'] {
       if (m.id === CURRENT_OMSU) {
         // текущее ОМСУ — часть показателей уже в разных статусах для демонстрации
         const demo: Record<string, OmsuValue> = {
-          i1: { value: 91.4, base: 90.0, target: 93.5, status: 'approved', updatedAt: '24.07.2026 11:20', signedBy: 'Иванова А.П. (ЭЦП)' },
-          i2: { value: 83.2, base: 82.0, target: 86.0, status: 'pending_cio', updatedAt: '25.07.2026 09:05', signedBy: 'Иванова А.П. (ЭЦП)' },
-          i3: { value: 77.6, base: 76.5, target: 80.0, status: 'returned', updatedAt: '25.07.2026 14:40', comment: 'Уточните методику: протяжённость по актам КОМОС отличается от паспорта дорог', signedBy: 'Иванова А.П. (ЭЦП)' },
-          i4: { value: 63.5, base: 62.8, target: 65.0, status: 'draft', updatedAt: '26.07.2026 10:12' },
+          i1: { ...makeFields(91.4), status: 'approved', updatedAt: '24.07.2026 11:20', signedBy: 'Иванова А.П. (ЭЦП)' },
+          i2: { ...makeFields(83.2), status: 'pending_cio', updatedAt: '25.07.2026 09:05', signedBy: 'Иванова А.П. (ЭЦП)' },
+          i3: { ...makeFields(77.6), status: 'returned', updatedAt: '25.07.2026 14:40', comment: 'Уточните методику: протяжённость по актам КОМОС отличается от паспорта дорог', signedBy: 'Иванова А.П. (ЭЦП)' },
+          i4: { ...makeFields(63.5), status: 'draft', updatedAt: '26.07.2026 10:12' },
         };
-        res[m.id][ind.id] = demo[ind.id] ?? { value: null, base: null, target: null, status: 'not_filled', updatedAt: null };
+        res[m.id][ind.id] = demo[ind.id] ?? { ...emptyValueFields(), status: 'not_filled', updatedAt: null };
       } else {
         const st = STATUS_POOL[(mi * 3 + ii * 5) % STATUS_POOL.length];
-        const base = Math.round(v * 0.97 * 100) / 100;
-        const target = Math.round(v * 1.03 * 100) / 100;
         res[m.id][ind.id] = st === 'not_filled'
-          ? { value: null, base: null, target: null, status: st, updatedAt: null }
-          : { value: v, base, target, status: st, updatedAt: `${20 + ((mi + ii) % 6)}.07.2026 ${9 + (ii % 8)}:${10 + mi}` };
+          ? { ...emptyValueFields(), status: st, updatedAt: null }
+          : { ...makeFields(v), status: st, updatedAt: `${20 + ((mi + ii) % 6)}.07.2026 ${9 + (ii % 8)}:${10 + mi}` };
       }
     });
   });
@@ -138,15 +149,13 @@ function buildCioValues(): AppState['cioValues'] {
   INDICATORS.forEach((ind) => {
     res[ind.id] = {};
     if (ind.cioId === CURRENT_CIO) {
-      res[ind.id][ind.cioId] = { value: null, base: null, target: null, status: 'not_filled', updatedAt: null };
+      res[ind.id][ind.cioId] = { ...emptyValueFields(), status: 'not_filled', updatedAt: null };
     } else {
       const [lo, hi] = RANGES[ind.id];
       const v = Math.round((lo + rnd() * (hi - lo)) * 100) / 100;
       const st: CioValue['status'] = rnd() > 0.5 ? 'approved' : 'pending_mef';
       res[ind.id][ind.cioId] = {
-        value: v,
-        base: Math.round(v * 0.97 * 100) / 100,
-        target: Math.round(v * 1.03 * 100) / 100,
+        ...makeFields(v),
         status: st,
         updatedAt: '23.07.2026 15:30',
       };
