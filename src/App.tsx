@@ -29,11 +29,9 @@ const NAV: Record<RoleId, { id: PageId; label: string }[]> = {
     { id: 'rating', label: 'Рейтинг' },
   ],
   cio: [
-    { id: 'overview', label: 'Обзор сбора' },
     { id: 'cio', label: 'Рабочее место ЦИО' },
   ],
   omsu: [
-    { id: 'overview', label: 'Обзор сбора' },
     { id: 'omsu', label: 'Форма ОМСУ' },
   ],
 };
@@ -62,7 +60,7 @@ function Shell() {
     <div className="min-h-screen bg-slate-100">
       {/* Шапка в стиле ГАС "Управление" МО */}
       <header className="bg-gradient-to-r from-[#1e5c8f] via-[#2a6ea6] to-[#3a83bd] text-white shadow">
-        <div className="mx-auto max-w-[1400px] px-4 py-3 flex items-center gap-4">
+        <div className="w-full px-4 py-3 flex items-center gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/15 shrink-0">
               <Landmark className="h-6 w-6" />
@@ -132,7 +130,7 @@ function Shell() {
 
         {/* Навигация */}
         <div className="bg-[#16486f]/60">
-          <div className="mx-auto max-w-[1400px] px-4 flex gap-1">
+          <div className="w-full px-4 flex gap-1">
             {NAV[role].map((item) => (
               <button
                 key={item.id}
@@ -151,14 +149,14 @@ function Shell() {
       </header>
 
       {/* Контекст роли */}
-      <div className="mx-auto max-w-[1400px] px-4 py-2">
+      <div className="w-full px-4 py-2">
         <div className="rounded-md bg-white border px-3 py-2 text-xs text-muted-foreground flex flex-wrap gap-x-4">
           <span><b className="text-slate-700">{roleInfo.name}</b> · {roleInfo.org}</span>
           <span>{roleInfo.description}</span>
         </div>
       </div>
 
-      <main className="mx-auto max-w-[1400px] px-4 pb-10">
+      <main className="w-full px-4 pb-10">
         {page === 'overview' && <Overview role={role} />}
         {page === 'setup' && <Setup />}
         {page === 'omsu' && <OmsuForm />}
@@ -169,7 +167,7 @@ function Shell() {
       </main>
 
       <footer className="border-t bg-white py-3">
-        <div className="mx-auto max-w-[1400px] px-4 text-xs text-muted-foreground">
+        <div className="w-full px-4 text-xs text-muted-foreground">
           Прототип доработки ИС «Конструктор форм» — модуль формирования рейтинга ОМСУ. Данные демонстрационные.
         </div>
       </footer>
