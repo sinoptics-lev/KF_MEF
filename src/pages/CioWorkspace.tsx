@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useStore } from '@/lib/store';
 import { MUNICIPALITIES, CURRENT_CIO, CIOS } from '@/lib/data';
+import { VALUE_FIELDS, emptyValueFields, type ValueFieldKey } from '@/lib/types';
 import { OmsuStatusBadge, CioStatusBadge } from '@/components/StatusBadge';
+import { ValueGroupHeader, fieldTint } from '@/components/ValueColumns';
 import { SignDialog } from '@/components/SignDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,8 +31,8 @@ export function CioWorkspace() {
   );
 
   // Среднее значение по введённым показателям ОМСУ — по каждому показателю отрасли
-  // и по каждому заполняемому полю (факт / прогноз базовый / прогноз целевой)
-  const avgByInd = (indId: string, field: 'value' | 'base' | 'target') => {
+  // и по каждому заполняемому полю (отчётные годы, оценка, варианты прогнозов)
+  const avgByInd = (indId: string, field: ValueFieldKey) => {
     const vals = MUNICIPALITIES
       .map((m) => state.omsuValues[m.id]?.[indId]?.[field])
       .filter((x): x is number => x !== null && x !== undefined);
@@ -75,19 +77,16 @@ export function CioWorkspace() {
               <CardContent className="pt-0 overflow-x-auto">
                 <table className="w-full text-sm border-collapse">
                   <thead>
-                    <tr className="border-b text-xs text-muted-foreground">
-                      <th rowSpan={2} className="text-left p-2 align-middle">ОМСУ</th>
-                      <th className="text-center p-1.5 w-24 border-l border-b bg-green-50/70">Отчёт 2026</th>
-                      <th colSpan={2} className="text-center p-1.5 border-l border-b bg-blue-50/70">Прогноз (2027)</th>
-                      <th rowSpan={2} className="text-left p-2 align-middle">Статус</th>
-                      <th rowSpan={2} className="text-left p-2 align-middle">Обновлено</th>
-                      <th rowSpan={2} className="text-right p-2 w-64 align-middle">Действия</th>
-                    </tr>
-                    <tr className="border-b text-xs text-muted-foreground">
-                      <th className="text-center p-1.5 border-l bg-green-50/70 font-medium">Факт</th>
-                      <th className="text-center p-1.5 w-24 border-l bg-blue-50/70 font-medium">Базовый вариант</th>
-                      <th className="text-center p-1.5 w-24 bg-blue-50/70 font-medium">Целевой вариант</th>
-                    </tr>
+                    <ValueGroupHeader
+                      leading={<th rowSpan={2} className="text-left p-2 align-middle min-w-[130px]">ОМСУ</th>}
+                      trailing={(
+                        <>
+                          <th rowSpan={2} className="text-left p-2 align-middle border-l">Статус</th>
+                          <th rowSpan={2} className="text-left p-2 align-middle">Обновлено</th>
+                          <th rowSpan={2} className="text-right p-2 w-64 align-middle">Действия</th>
+                        </>
+                      )}
+                    />
                   </thead>
                   <tbody>
                     {MUNICIPALITIES.map((m) => {
@@ -96,9 +95,11 @@ export function CioWorkspace() {
                       return (
                         <tr key={m.id} className={`border-b ${v.status === 'pending_cio' ? 'bg-amber-50/60' : 'hover:bg-slate-50'}`}>
                           <td className="p-2 font-medium">{m.name}</td>
-                          <td className="p-2 text-center font-medium bg-green-50/30">{fmt(v.value)}</td>
-                          <td className="p-2 text-center bg-blue-50/30">{fmt(v.base ?? null)}</td>
-                          <td className="p-2 text-center bg-blue-50/30">{fmt(v.target ?? null)}</td>
+                          {VALUE_FIELDS.map((f) => (
+                            <td key={f.key} className={`p-1.5 text-center ${f.key === 'v2026' ? 'font-medium' : ''} ${fieldTint(f.key)}`}>
+                              {fmt(v[f.key])}
+                            </td>
+                          ))}
                           <td className="p-2"><OmsuStatusBadge status={v.status} /></td>
                           <td className="p-2 text-xs text-muted-foreground">{v.updatedAt ?? '—'}</td>
                           <td className="p-2 text-right whitespace-nowrap">
@@ -139,33 +140,30 @@ export function CioWorkspace() {
           <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm flex gap-2">
             <Info className="h-4 w-4 text-blue-700 mt-0.5 shrink-0" />
             <span>
-              ЦИО вносит собственные значения по тем же показателям, что заполняют ОМСУ его отрасли: факт отчётного периода,
-              прогноз по базовому и целевому вариантам. Подпишите ЭЦП и отправьте на согласование в МЭФ. Пока МЭФ не согласовал —
-              можно отозвать на изменение. Под каждым полем для справки отображается среднее значение по введённым данным ОМСУ
-              (с указанием количества ОМСУ, внёсших значение).
+              ЦИО вносит собственные значения по тем же показателям, что заполняют ОМСУ его отрасли: отчётные данные за 2023–2025 гг.,
+              оценку 2026 г. и прогнозы на 2027–2029 гг. по консервативному и базовому вариантам. Подпишите ЭЦП и отправьте на
+              согласование в МЭФ. Пока МЭФ не согласовал — можно отозвать на изменение. Под каждым полем для справки отображается
+              среднее значение по введённым данным ОМСУ (с указанием количества ОМСУ, внёсших значение).
             </span>
           </div>
           <Card>
             <CardContent className="pt-4 overflow-x-auto">
               <table className="w-full text-sm border-collapse">
                 <thead>
-                  <tr className="border-b text-xs text-muted-foreground">
-                    <th rowSpan={2} className="text-left p-2 align-middle">Показатель</th>
-                    <th className="text-center p-1.5 w-28 border-l border-b bg-green-50/70">Отчёт 2026</th>
-                    <th colSpan={2} className="text-center p-1.5 border-l border-b bg-blue-50/70">Прогноз (2027)</th>
-                    <th rowSpan={2} className="text-left p-2 align-middle">Статус</th>
-                    <th rowSpan={2} className="text-left p-2 align-middle">Комментарий МЭФ</th>
-                    <th rowSpan={2} className="text-right p-2 w-64 align-middle">Действия</th>
-                  </tr>
-                  <tr className="border-b text-xs text-muted-foreground">
-                    <th className="text-center p-1.5 border-l bg-green-50/70 font-medium">Факт</th>
-                    <th className="text-center p-1.5 w-28 border-l bg-blue-50/70 font-medium">Базовый вариант</th>
-                    <th className="text-center p-1.5 w-28 bg-blue-50/70 font-medium">Целевой вариант</th>
-                  </tr>
+                  <ValueGroupHeader
+                    leading={<th rowSpan={2} className="text-left p-2 align-middle min-w-[220px]">Показатель</th>}
+                    trailing={(
+                      <>
+                        <th rowSpan={2} className="text-left p-2 align-middle border-l">Статус</th>
+                        <th rowSpan={2} className="text-left p-2 align-middle">Комментарий МЭФ</th>
+                        <th rowSpan={2} className="text-right p-2 w-64 align-middle">Действия</th>
+                      </>
+                    )}
+                  />
                 </thead>
                 <tbody>
                   {myIndicators.map((ind) => {
-                    const v = state.cioValues[ind.id]?.[CURRENT_CIO] ?? { value: null, base: null, target: null, status: 'not_filled' as const, updatedAt: null };
+                    const v = state.cioValues[ind.id]?.[CURRENT_CIO] ?? { ...emptyValueFields(), status: 'not_filled' as const, updatedAt: null };
                     const editable = v.status === 'not_filled' || v.status === 'draft' || v.status === 'returned';
                     return (
                       <tr key={ind.id} className="border-b hover:bg-slate-50 align-top">
@@ -173,31 +171,31 @@ export function CioWorkspace() {
                           <div className="font-medium">{ind.num} {ind.name}</div>
                           <div className="text-xs text-muted-foreground">ед. изм.: {ind.unit} · формула: {ind.formula}</div>
                         </td>
-                        {(['value', 'base', 'target'] as const).map((field) => {
-                          const { avg, count } = avgByInd(ind.id, field);
+                        {VALUE_FIELDS.map((f) => {
+                          const { avg, count } = avgByInd(ind.id, f.key);
                           return (
-                            <td key={field} className={`p-2 text-center ${field !== 'value' ? 'bg-blue-50/30' : 'bg-green-50/30'}`}>
+                            <td key={f.key} className={`p-1.5 text-center ${fieldTint(f.key)}`}>
                               {editable ? (
                                 <Input
                                   type="number"
                                   step="0.1"
-                                  className="h-8 w-24 text-center mx-auto bg-white"
+                                  className="h-8 w-[76px] text-center mx-auto bg-white px-1"
                                   placeholder="—"
-                                  value={v[field] ?? ''}
+                                  value={v[f.key] ?? ''}
                                   onChange={(e) =>
                                     dispatch({
                                       type: 'CIO_SET_OWN',
                                       cioIndId: ind.id,
                                       cioId: CURRENT_CIO,
-                                      field,
+                                      field: f.key,
                                       value: e.target.value === '' ? null : Number(e.target.value),
                                     })
                                   }
                                 />
                               ) : (
-                                <span className={field === 'value' ? 'font-medium' : ''}>{fmt(v[field] ?? null)}</span>
+                                <span className={f.key === 'v2026' ? 'font-medium' : ''}>{fmt(v[f.key])}</span>
                               )}
-                              <div className="mt-1 text-xs whitespace-nowrap">
+                              <div className="mt-1 text-[11px] whitespace-nowrap">
                                 <span className="text-muted-foreground">ср. ОМСУ: </span>
                                 <span className="font-medium text-blue-800">{avg !== null ? fmt(avg) : '—'}</span>
                                 <span className="text-muted-foreground"> · {count}</span>
@@ -208,7 +206,7 @@ export function CioWorkspace() {
                         <td className="p-2"><CioStatusBadge status={v.status} /></td>
                         <td className="p-2 text-xs text-red-700">{v.comment ?? ''}</td>
                         <td className="p-2 text-right whitespace-nowrap">
-                          {editable && v.value !== null && (
+                          {editable && v.v2026 !== null && (
                             <Button size="sm" onClick={() => setSignTarget(ind.id)}>
                               <FileSignature className="h-3.5 w-3.5 mr-1" /> Подписать ЭЦП и отправить в МЭФ
                             </Button>
