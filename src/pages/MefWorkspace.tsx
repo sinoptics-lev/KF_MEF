@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useStore } from '@/lib/store';
 import { CIOS, MUNICIPALITIES } from '@/lib/data';
+import { VALUE_FIELDS } from '@/lib/types';
 import { CioStatusBadge } from '@/components/StatusBadge';
+import { ValueGroupHeader, fieldTint } from '@/components/ValueColumns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -144,31 +146,34 @@ export function MefWorkspace({ goRating }: { goRating: () => void }) {
             <CardContent className="pt-0 overflow-x-auto">
               <table className="w-full text-sm border-collapse">
                 <thead>
-                  <tr className="border-b text-xs text-muted-foreground">
-                    <th rowSpan={2} className="text-left p-2 align-middle">ЦИО</th>
-                    <th rowSpan={2} className="text-left p-2 align-middle">Показатель</th>
-                    <th className="text-center p-1.5 w-24 border-l border-b bg-green-50/70">Отчёт 2026</th>
-                    <th colSpan={2} className="text-center p-1.5 border-l border-b bg-blue-50/70">Прогноз (2027)</th>
-                    <th rowSpan={2} className="text-left p-2 align-middle">Статус</th>
-                    <th rowSpan={2} className="text-right p-2 w-56 align-middle">Действия</th>
-                  </tr>
-                  <tr className="border-b text-xs text-muted-foreground">
-                    <th className="text-center p-1.5 border-l bg-green-50/70 font-medium">Факт</th>
-                    <th className="text-center p-1.5 w-24 border-l bg-blue-50/70 font-medium">Базовый вариант</th>
-                    <th className="text-center p-1.5 w-24 bg-blue-50/70 font-medium">Целевой вариант</th>
-                  </tr>
+                  <ValueGroupHeader
+                    leading={(
+                      <>
+                        <th rowSpan={2} className="text-left p-2 align-middle">ЦИО</th>
+                        <th rowSpan={2} className="text-left p-2 align-middle min-w-[200px]">Показатель</th>
+                      </>
+                    )}
+                    trailing={(
+                      <>
+                        <th rowSpan={2} className="text-left p-2 align-middle border-l">Статус</th>
+                        <th rowSpan={2} className="text-right p-2 w-56 align-middle">Действия</th>
+                      </>
+                    )}
+                  />
                 </thead>
                 <tbody>
                   {ownRows.map(({ ind, cioId, v }) => (
                     <tr key={ind.id + cioId} className={`border-b ${v.status === 'pending_mef' ? 'bg-amber-50/60' : 'hover:bg-slate-50'}`}>
                       <td className="p-2"><Badge variant="secondary">{CIOS.find((c) => c.id === cioId)?.short}</Badge></td>
                       <td className="p-2 font-medium">{ind.num} {ind.name}</td>
-                      <td className="p-2 text-center font-medium bg-green-50/30">
-                        {fmt(v.value)}
-                        {v.value !== null && <span className="text-xs font-normal text-muted-foreground"> {ind.unit}</span>}
-                      </td>
-                      <td className="p-2 text-center bg-blue-50/30">{fmt(v.base ?? null)}</td>
-                      <td className="p-2 text-center bg-blue-50/30">{fmt(v.target ?? null)}</td>
+                      {VALUE_FIELDS.map((f) => (
+                        <td key={f.key} className={`p-1.5 text-center ${f.key === 'v2026' ? 'font-medium' : ''} ${fieldTint(f.key)}`}>
+                          {fmt(v[f.key])}
+                          {f.key === 'v2026' && v.v2026 !== null && (
+                            <span className="text-xs font-normal text-muted-foreground"> {ind.unit}</span>
+                          )}
+                        </td>
+                      ))}
                       <td className="p-2"><CioStatusBadge status={v.status} /></td>
                       <td className="p-2 text-right whitespace-nowrap">
                         {v.status === 'pending_mef' && (
