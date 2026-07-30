@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useStore } from '@/lib/store';
 import { DIRECTIONS, CIOS } from '@/lib/data';
 import type { Indicator } from '@/lib/types';
+import { EMPTY_TREE_FILTER, chevronParents, visibleTree, type TreeFilter } from '@/lib/indTree';
+import { IndToolbar, TreeToggle } from '@/components/IndToolbar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +22,12 @@ export function Setup() {
   const { state, dispatch } = useStore();
   const [editInd, setEditInd] = useState<Indicator | null>(null);
   const [isNew, setIsNew] = useState(false);
+  const [treeFilter, setTreeFilter] = useState<TreeFilter>(EMPTY_TREE_FILTER);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+
+  const visible = visibleTree(state.indicators, collapsed, treeFilter);
+  const parents = chevronParents(state.indicators, treeFilter);
+  const toggleNode = (id: string) => setCollapsed((p) => ({ ...p, [id]: !p[id] }));
 
   const openNew = () => {
     setIsNew(true);
@@ -33,6 +41,8 @@ export function Setup() {
       optimum: 'max',
       weight: 1,
       formula: '',
+      level: 1,
+      parentId: null,
     });
   };
 
@@ -62,8 +72,14 @@ export function Setup() {
 
         <TabsContent value="indicators">
           <div className="space-y-4">
+            <IndToolbar
+              filter={treeFilter}
+              onChange={setTreeFilter}
+              shown={visible.length}
+              total={state.indicators.length}
+            />
             {DIRECTIONS.map((d) => {
-              const inds = state.indicators.filter((i) => i.directionId === d.id);
+              const inds = visible.filter((i) => i.directionId === d.id);
               if (!inds.length) return null;
               return (
                 <Card key={d.id}>
@@ -86,18 +102,32 @@ export function Setup() {
                       </thead>
                       <tbody>
                         {inds.map((ind) => (
-                          <tr key={ind.id} className="border-b hover:bg-slate-50">
-                            <td className="p-2 text-muted-foreground">{ind.num}</td>
-                            <td className="p-2 font-medium">{ind.name}</td>
-                            <td className="p-2"><Badge variant="secondary">{CIOS.find((c) => c.id === ind.cioId)?.short}</Badge></td>
-                            <td className="p-2">{ind.unit}</td>
-                            <td className="p-2">
-                              <Badge variant="outline" className={ind.optimum === 'max' ? 'text-green-700 border-green-300' : 'text-red-700 border-red-300'}>
-                                {ind.optimum === 'max' ? '↑ max' : '↓ min'}
-                              </Badge>
+                          <tr key={ind.id} className={`border-b ${ind.isGroup ? 'bg-slate-50/80' : 'hover:bg-slate-50'}`}>
+                            <td className="p-2 text-muted-foreground whitespace-nowrap">{ind.num}</td>
+                            <td className={`p-2 ${ind.isGroup ? 'font-semibold text-slate-700' : 'font-medium'}`}>
+                              <span className="flex items-center gap-1" style={{ paddingLeft: `${(ind.level - 1) * 18}px` }}>
+                                <TreeToggle
+                                  hasChildren={parents.has(ind.id)}
+                                  collapsed={!!collapsed[ind.id]}
+                                  onToggle={() => toggleNode(ind.id)}
+                                />
+                                <span>
+                                  {ind.isGroup && <span className="mr-1 text-slate-400">▸</span>}
+                                  {ind.name}
+                                </span>
+                              </span>
                             </td>
-                            <td className="p-2">{ind.weight}</td>
-                            <td className="p-2 text-xs text-muted-foreground font-mono">{ind.formula}</td>
+                            <td className="p-2"><Badge variant="secondary">{CIOS.find((c) => c.id === ind.cioId)?.short}</Badge></td>
+                            <td className="p-2">{ind.isGroup ? '—' : ind.unit}</td>
+                            <td className="p-2">
+                              {ind.isGroup ? <span className="text-muted-foreground">—</span> : (
+                                <Badge variant="outline" className={ind.optimum === 'max' ? 'text-green-700 border-green-300' : 'text-red-700 border-red-300'}>
+                                  {ind.optimum === 'max' ? '↑ max' : '↓ min'}
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="p-2">{ind.isGroup ? '—' : ind.weight}</td>
+                            <td className="p-2 text-xs text-muted-foreground font-mono">{ind.isGroup ? '—' : ind.formula}</td>
                             <td className="p-2">
                               <Button variant="ghost" size="icon" onClick={() => { setIsNew(false); setEditInd({ ...ind }); }}>
                                 <Pencil className="h-4 w-4" />
