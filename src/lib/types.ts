@@ -43,7 +43,7 @@ export interface Municipality {
 
 export interface Indicator {
   id: string;
-  num: string;           // порядковый номер, напр. "4.2"
+  num: string;           // иерархический номер, напр. "1.1.12.3"
   name: string;
   directionId: string;
   cioId: string;         // отраслевой ЦИО, к которому привязан показатель
@@ -51,7 +51,13 @@ export interface Indicator {
   optimum: 'max' | 'min'; // что лучше: больше или меньше
   weight: number;
   formula: string;        // формула нормирования/расчёта
+  level: number;          // уровень в иерархии: 1 — верхний, 2+ — вложенные (по отступу в файле показателей)
+  parentId: string | null;
+  isGroup?: boolean;      // строка-группа (без единицы измерения): не заполняется и не участвует в рейтинге
 }
+
+/** Заполняемый показатель (не группа) */
+export const isFillable = (i: Indicator): boolean => !i.isGroup;
 
 /** Набор заполняемых полей показателя: отчёт 2023–2025, оценка 2026, прогнозы 2027–2029 (2 варианта) */
 export const VALUE_FIELDS = [

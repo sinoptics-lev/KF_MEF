@@ -53,7 +53,7 @@ export function rankValues(values: { id: string; value: number }[], optimum: 'ma
 
 /** Полный расчёт рейтинга */
 export function computeRating(state: AppState, mode: 'preview' | 'final'): MunRating[] {
-  const inds = state.indicators;
+  const inds = state.indicators.filter((i) => !i.isGroup);
   const ranksByInd: Record<string, Record<string, number>> = {};
   inds.forEach((ind) => {
     const vals: { id: string; value: number }[] = [];
@@ -97,7 +97,7 @@ export function computeRating(state: AppState, mode: 'preview' | 'final'): MunRa
 export function computeDirectionRatings(state: AppState, rows: MunRating[]): Record<string, Record<string, DirectionRating>> {
   const result: Record<string, Record<string, DirectionRating>> = {};
   DIRECTIONS.forEach((d) => {
-    const inds = state.indicators.filter((i) => i.directionId === d.id);
+    const inds = state.indicators.filter((i) => i.directionId === d.id && !i.isGroup);
     const scores = rows.map((r) => {
       let sum = 0;
       let cnt = 0;
@@ -137,7 +137,7 @@ export function rankColor(rank: number | null, maxRank: number): string {
 export function approvalStats(state: AppState) {
   let total = 0, approved = 0, pending = 0, returned = 0, draft = 0, empty = 0;
   Object.values(state.omsuValues).forEach((perMun) => {
-    state.indicators.forEach((ind) => {
+    state.indicators.filter((i) => !i.isGroup).forEach((ind) => {
       const v = perMun[ind.id];
       total += 1;
       if (!v || v.status === 'not_filled') empty += 1;
