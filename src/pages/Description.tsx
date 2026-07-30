@@ -164,7 +164,7 @@ export function Description() {
       <div>
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <BookOpen className="h-5 w-5 text-blue-700" />
-          Описание системы — модуль «Формирование рейтинга ОМСУ»
+          Описание системы — модуль «Прогноз СЭР МО»
         </h2>
         <p className="text-sm text-muted-foreground">
           Доработка ИС «Конструктор форм» для сбора данных и расчёта рейтинга муниципальных образований по показателям МЭФ
