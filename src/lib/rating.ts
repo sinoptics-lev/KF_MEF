@@ -24,13 +24,13 @@ export interface DirectionRating {
   place: number | null;
 }
 
-/** Выбор значения в зависимости от режима рейтинга */
+/** Выбор значения в зависимости от режима рейтинга (оценка 2026 — рейтинговый год) */
 function pickValue(state: AppState, munId: string, indId: string, mode: 'preview' | 'final') {
   const v = state.omsuValues[munId]?.[indId];
-  if (!v || v.value === null) return { value: null, approved: false };
+  if (!v || v.v2026 === null) return { value: null, approved: false };
   const approved = v.status === 'approved';
   if (mode === 'final' && !approved) return { value: null, approved: false };
-  return { value: v.value, approved };
+  return { value: v.v2026, approved };
 }
 
 /** Ранжирование: лучшее значение = место 1 */

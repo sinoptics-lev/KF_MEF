@@ -1,14 +1,20 @@
 import React, { createContext, useContext, useReducer } from 'react';
-import type { AppState, Indicator, RoleId } from './types';
+import { VALUE_FIELDS, emptyValueFields } from './types';
+import type { AppState, Indicator, RoleId, ValueFieldKey } from './types';
 import { INITIAL_STATE } from './data';
 
+/** Заполнено ли хотя бы одно поле значения */
+function hasAnyValue(v: Record<ValueFieldKey, number | null>): boolean {
+  return VALUE_FIELDS.some((f) => v[f.key] !== null);
+}
+
 export type Action =
-  | { type: 'OMSU_SET_VALUE'; munId: string; indId: string; field: 'value' | 'base' | 'target'; value: number | null }
+  | { type: 'OMSU_SET_VALUE'; munId: string; indId: string; field: ValueFieldKey; value: number | null }
   | { type: 'OMSU_SIGN_SEND'; munId: string; indId: string; actor: string }
   | { type: 'OMSU_RECALL'; munId: string; indId: string; actor: string }
   | { type: 'CIO_APPROVE'; munId: string; indId: string; actor: string }
   | { type: 'CIO_RETURN'; munId: string; indId: string; actor: string; comment: string }
-  | { type: 'CIO_SET_OWN'; cioIndId: string; cioId: string; field: 'value' | 'base' | 'target'; value: number | null }
+  | { type: 'CIO_SET_OWN'; cioIndId: string; cioId: string; field: ValueFieldKey; value: number | null }
   | { type: 'CIO_SIGN_OWN'; cioIndId: string; cioId: string; actor: string }
   | { type: 'CIO_RECALL_OWN'; cioIndId: string; cioId: string; actor: string }
   | { type: 'MEF_APPROVE'; cioIndId: string; cioId: string; actor: string }
@@ -35,8 +41,7 @@ function reducer(state: AppState, a: Action): AppState {
       const cur = state.omsuValues[a.munId][a.indId];
       if (cur.status === 'approved' || cur.status === 'pending_cio') return state;
       const next = { ...cur, [a.field]: a.value, updatedAt: now(), comment: undefined };
-      const hasAny = next.value !== null || (next.base ?? null) !== null || (next.target ?? null) !== null;
-      next.status = hasAny ? 'draft' : 'not_filled';
+      next.status = hasAnyValue(next) ? 'draft' : 'not_filled';
       return {
         ...state,
         omsuValues: {
@@ -50,7 +55,7 @@ function reducer(state: AppState, a: Action): AppState {
     }
     case 'OMSU_SIGN_SEND': {
       const cur = state.omsuValues[a.munId][a.indId];
-      if (cur.value === null) return state;
+      if (cur.v2026 === null) return state;
       if (cur.status !== 'draft' && cur.status !== 'returned') return state;
       return {
         ...state,
@@ -113,10 +118,9 @@ function reducer(state: AppState, a: Action): AppState {
     case 'CIO_SET_OWN': {
       const cur = state.cioValues[a.cioIndId]?.[a.cioId];
       if (cur && (cur.status === 'approved' || cur.status === 'pending_mef')) return state;
-      const base0 = cur ?? { value: null, base: null, target: null, status: 'not_filled' as const, updatedAt: null };
+      const base0 = cur ?? { ...emptyValueFields(), status: 'not_filled' as const, updatedAt: null };
       const next = { ...base0, [a.field]: a.value, updatedAt: now(), comment: undefined };
-      const hasAny = next.value !== null || (next.base ?? null) !== null || (next.target ?? null) !== null;
-      next.status = hasAny ? 'draft' : 'not_filled';
+      next.status = hasAnyValue(next) ? 'draft' : 'not_filled';
       return {
         ...state,
         cioValues: {
@@ -130,7 +134,7 @@ function reducer(state: AppState, a: Action): AppState {
     }
     case 'CIO_SIGN_OWN': {
       const cur = state.cioValues[a.cioIndId]?.[a.cioId];
-      if (!cur || cur.value === null) return state;
+      if (!cur || cur.v2026 === null) return state;
       if (cur.status !== 'draft' && cur.status !== 'returned') return state;
       return {
         ...state,
