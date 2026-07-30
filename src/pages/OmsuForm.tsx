@@ -1,25 +1,53 @@
 import { useState } from 'react';
 import { useStore } from '@/lib/store';
 import { DIRECTIONS, CIOS, CURRENT_OMSU, MUNICIPALITIES } from '@/lib/data';
+import { VALUE_FIELDS } from '@/lib/types';
 import { OmsuStatusBadge } from '@/components/StatusBadge';
+import { ValueGroupHeader, fieldTint } from '@/components/ValueColumns';
 import { SignDialog } from '@/components/SignDialog';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { FileSignature, Undo2, Lock, AlertTriangle, Info } from 'lucide-react';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { FileSignature, Undo2, Lock, AlertTriangle, Info, ChevronDown, Users } from 'lucide-react';
 import { fmt } from '@/lib/rating';
+
+/** Сводка статусов по набору показателей сферы */
+function dirStats(inds: { id: string }[], values: Record<string, { status: string } | undefined>) {
+  const total = inds.length;
+  let filled = 0, approved = 0, pending = 0, returned = 0;
+  inds.forEach((i) => {
+    const st = values[i.id]?.status ?? 'not_filled';
+    if (st !== 'not_filled') filled += 1;
+    if (st === 'approved') approved += 1;
+    if (st === 'pending_cio') pending += 1;
+    if (st === 'returned') returned += 1;
+  });
+  return { total, filled, approved, pending, returned };
+}
 
 export function OmsuForm() {
   const { state, dispatch } = useStore();
   const munId = CURRENT_OMSU;
   const mun = MUNICIPALITIES.find((m) => m.id === munId)!;
   const [signTarget, setSignTarget] = useState<string | null>(null);
+  // аккордеон: открыта только одна сфера
+  const [openDir, setOpenDir] = useState<string | null>(DIRECTIONS[0]?.id ?? null);
+  // показатель, по которому открыто модальное окно со значениями всех ОМСУ
+  const [compareInd, setCompareInd] = useState<string | null>(null);
 
   const values = state.omsuValues[munId];
   const total = state.indicators.length;
   const approved = state.indicators.filter((i) => values[i.id]?.status === 'approved').length;
   const pending = state.indicators.filter((i) => values[i.id]?.status === 'pending_cio').length;
+
+  const cmpInd = state.indicators.find((i) => i.id === compareInd) ?? null;
 
   return (
     <div className="space-y-4">
@@ -41,114 +69,175 @@ export function OmsuForm() {
         <span>
           Заполните значения, подпишите ЭЦП и отправьте на согласование отраслевому ЦИО.
           Пока показатель не согласован, его можно <b>отозвать на изменение</b> и отправить повторно.
-          После согласования ЦИО изменение блокируется.
+          После согласования ЦИО изменение блокируется. Наборы показателей по сферам можно сворачивать —
+          одновременно открыта одна сфера.
         </span>
       </div>
 
       {DIRECTIONS.map((d) => {
         const inds = state.indicators.filter((i) => i.directionId === d.id);
         if (!inds.length) return null;
+        const st = dirStats(inds, values);
+        const open = openDir === d.id;
         return (
           <Card key={d.id}>
-            <CardHeader className="py-3">
-              <CardTitle className="text-base">{d.name}</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0 overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="border-b text-xs text-muted-foreground">
-                    <th rowSpan={2} className="text-left p-2 w-12 align-middle">№</th>
-                    <th rowSpan={2} className="text-left p-2 align-middle">Показатель</th>
-                    <th rowSpan={2} className="text-left p-2 align-middle">ЦИО</th>
-                    <th className="text-center p-1.5 w-28 border-l border-b bg-green-50/70">Отчёт 2026</th>
-                    <th colSpan={2} className="text-center p-1.5 border-l border-b bg-blue-50/70">Прогноз (2027)</th>
-                    <th rowSpan={2} className="text-left p-2 align-middle">Статус</th>
-                    <th rowSpan={2} className="text-left p-2 align-middle">Комментарий / подпись</th>
-                    <th rowSpan={2} className="text-right p-2 w-56 align-middle">Действия</th>
-                  </tr>
-                  <tr className="border-b text-xs text-muted-foreground">
-                    <th className="text-center p-1.5 border-l bg-green-50/70 font-medium">Факт</th>
-                    <th className="text-center p-1.5 w-28 border-l bg-blue-50/70 font-medium">Базовый вариант</th>
-                    <th className="text-center p-1.5 w-28 bg-blue-50/70 font-medium">Целевой вариант</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {inds.map((ind) => {
-                    const v = values[ind.id];
-                    const editable = v.status === 'not_filled' || v.status === 'draft' || v.status === 'returned';
-                    return (
-                      <tr key={ind.id} className="border-b hover:bg-slate-50 align-top">
-                        <td className="p-2 text-muted-foreground">{ind.num}</td>
-                        <td className="p-2">
-                          <div className="font-medium">{ind.name}</div>
-                          <div className="text-xs text-muted-foreground">ед. изм.: {ind.unit} · формула: {ind.formula}</div>
-                        </td>
-                        <td className="p-2"><Badge variant="secondary">{CIOS.find((c) => c.id === ind.cioId)?.short}</Badge></td>
-                        {(['value', 'base', 'target'] as const).map((field) => (
-                          <td key={field} className={`p-2 text-center ${field !== 'value' ? 'bg-blue-50/30' : 'bg-green-50/30'}`}>
-                            {editable ? (
-                              <Input
-                                type="number"
-                                step="0.01"
-                                className="h-8 w-24 text-center"
-                                placeholder="—"
-                                value={v[field] ?? ''}
-                                onChange={(e) =>
-                                  dispatch({
-                                    type: 'OMSU_SET_VALUE',
-                                    munId,
-                                    indId: ind.id,
-                                    field,
-                                    value: e.target.value === '' ? null : Number(e.target.value),
-                                  })
-                                }
-                              />
-                            ) : (
-                              <span className={field === 'value' ? 'font-medium' : ''}>{fmt(v[field] ?? null)}</span>
+            <button
+              type="button"
+              className="w-full flex items-center justify-between gap-3 px-6 py-3 text-left hover:bg-slate-50 rounded-t-xl transition-colors"
+              onClick={() => setOpenDir(open ? null : d.id)}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? '' : '-rotate-90'}`} />
+                <span className="font-semibold text-base truncate">{d.name}</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 justify-end text-xs">
+                <Badge variant="outline" className="text-slate-700 border-slate-300">
+                  Введено: {st.filled}/{st.total}
+                </Badge>
+                <Badge variant="outline" className="text-green-700 border-green-300">
+                  Согласовано: {st.approved}
+                </Badge>
+                <Badge variant="outline" className="text-amber-700 border-amber-300">
+                  На согласовании: {st.pending}
+                </Badge>
+                {st.returned > 0 && (
+                  <Badge variant="outline" className="text-red-700 border-red-300">
+                    Возвращено: {st.returned}
+                  </Badge>
+                )}
+              </div>
+            </button>
+
+            {open && (
+              <CardContent className="pt-0 overflow-x-auto">
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <ValueGroupHeader
+                      leading={(
+                        <>
+                          <th rowSpan={2} className="text-left p-2 w-12 align-middle">№</th>
+                          <th rowSpan={2} className="text-left p-2 align-middle min-w-[220px]">Показатель</th>
+                          <th rowSpan={2} className="text-left p-2 align-middle">ЦИО</th>
+                        </>
+                      )}
+                      trailing={(
+                        <>
+                          <th rowSpan={2} className="text-left p-2 align-middle border-l">Статус</th>
+                          <th rowSpan={2} className="text-left p-2 align-middle">Комментарий / подпись</th>
+                          <th rowSpan={2} className="text-right p-2 w-56 align-middle">Действия</th>
+                        </>
+                      )}
+                    />
+                  </thead>
+                  <tbody>
+                    {inds.map((ind) => {
+                      const v = values[ind.id];
+                      const editable = v.status === 'not_filled' || v.status === 'draft' || v.status === 'returned';
+                      return (
+                        <tr key={ind.id} className="border-b hover:bg-slate-50 align-top">
+                          <td className="p-2 text-muted-foreground">{ind.num}</td>
+                          <td className="p-2">
+                            <div className="flex items-start gap-1.5">
+                              <TooltipProvider delayDuration={150}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <button
+                                      type="button"
+                                      aria-label={`Информация о расчёте показателя ${ind.num}`}
+                                      className="mt-0.5 inline-flex shrink-0 cursor-help text-slate-400 hover:text-blue-700 focus:text-blue-700 transition-colors outline-none"
+                                    >
+                                      <Info className="h-4 w-4" />
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="right" sideOffset={6} className="max-w-xs p-3 text-xs leading-relaxed">
+                                    <div className="font-semibold text-sm mb-1">{ind.num}. {ind.name}</div>
+                                    <div><span className="opacity-60">Формула расчёта:</span> {ind.formula}</div>
+                                    <div><span className="opacity-60">Единица измерения:</span> {ind.unit}</div>
+                                    <div><span className="opacity-60">Оптимум:</span> {ind.optimum === 'max' ? 'чем больше, тем лучше (↑ max)' : 'чем меньше, тем лучше (↓ min)'}</div>
+                                    <div><span className="opacity-60">Вес в рейтинге:</span> {ind.weight}</div>
+                                    <div><span className="opacity-60">Отраслевой ЦИО:</span> {CIOS.find((c) => c.id === ind.cioId)?.short}</div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              <div className="font-medium">{ind.name}</div>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 shrink-0 text-blue-700 hover:text-blue-800 hover:bg-blue-50"
+                                title="Значения показателя по всем ОМСУ (просмотр)"
+                                onClick={() => setCompareInd(ind.id)}
+                              >
+                                <Users className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                          <td className="p-2"><Badge variant="secondary">{CIOS.find((c) => c.id === ind.cioId)?.short}</Badge></td>
+                          {VALUE_FIELDS.map((f) => (
+                            <td key={f.key} className={`p-1.5 text-center ${fieldTint(f.key)}`}>
+                              {editable ? (
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  className="h-8 w-[76px] text-center mx-auto px-1"
+                                  placeholder="—"
+                                  value={v[f.key] ?? ''}
+                                  onChange={(e) =>
+                                    dispatch({
+                                      type: 'OMSU_SET_VALUE',
+                                      munId,
+                                      indId: ind.id,
+                                      field: f.key,
+                                      value: e.target.value === '' ? null : Number(e.target.value),
+                                    })
+                                  }
+                                />
+                              ) : (
+                                <span className={f.key === 'v2026' ? 'font-medium' : ''}>{fmt(v[f.key])}</span>
+                              )}
+                            </td>
+                          ))}
+                          <td className="p-2"><OmsuStatusBadge status={v.status} /></td>
+                          <td className="p-2 text-xs">
+                            {v.comment && (
+                              <div className="flex gap-1 text-red-700">
+                                <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                                <span>{v.comment}</span>
+                              </div>
+                            )}
+                            {v.signedBy && v.status !== 'draft' && (
+                              <div className="text-muted-foreground mt-0.5">ЭЦП: {v.signedBy}</div>
                             )}
                           </td>
-                        ))}
-                        <td className="p-2"><OmsuStatusBadge status={v.status} /></td>
-                        <td className="p-2 text-xs">
-                          {v.comment && (
-                            <div className="flex gap-1 text-red-700">
-                              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                              <span>{v.comment}</span>
-                            </div>
-                          )}
-                          {v.signedBy && v.status !== 'draft' && (
-                            <div className="text-muted-foreground mt-0.5">ЭЦП: {v.signedBy}</div>
-                          )}
-                        </td>
-                        <td className="p-2 text-right whitespace-nowrap">
-                          {editable && v.value !== null && (
-                            <Button size="sm" variant="default" onClick={() => setSignTarget(ind.id)}>
-                              <FileSignature className="h-3.5 w-3.5 mr-1" />
-                              Подписать ЭЦП и отправить
-                            </Button>
-                          )}
-                          {v.status === 'pending_cio' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => dispatch({ type: 'OMSU_RECALL', munId, indId: ind.id, actor: mun.name })}
-                            >
-                              <Undo2 className="h-3.5 w-3.5 mr-1" />
-                              Отозвать на изменение
-                            </Button>
-                          )}
-                          {v.status === 'approved' && (
-                            <span className="inline-flex items-center gap-1 text-xs text-green-700">
-                              <Lock className="h-3.5 w-3.5" /> заблокировано
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </CardContent>
+                          <td className="p-2 text-right whitespace-nowrap">
+                            {editable && v.v2026 !== null && (
+                              <Button size="sm" variant="default" onClick={() => setSignTarget(ind.id)}>
+                                <FileSignature className="h-3.5 w-3.5 mr-1" />
+                                Подписать ЭЦП и отправить
+                              </Button>
+                            )}
+                            {v.status === 'pending_cio' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => dispatch({ type: 'OMSU_RECALL', munId, indId: ind.id, actor: mun.name })}
+                              >
+                                <Undo2 className="h-3.5 w-3.5 mr-1" />
+                                Отозвать на изменение
+                              </Button>
+                            )}
+                            {v.status === 'approved' && (
+                              <span className="inline-flex items-center gap-1 text-xs text-green-700">
+                                <Lock className="h-3.5 w-3.5" /> заблокировано
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </CardContent>
+            )}
           </Card>
         );
       })}
@@ -162,6 +251,51 @@ export function OmsuForm() {
           setSignTarget(null);
         }}
       />
+
+      {/* Значения показателя по всем ОМСУ — только просмотр */}
+      <Dialog open={!!cmpInd} onOpenChange={(v) => !v && setCompareInd(null)}>
+        <DialogContent className="sm:max-w-6xl">
+          <DialogHeader>
+            <DialogTitle>
+              {cmpInd ? `${cmpInd.num}. ${cmpInd.name}` : ''}
+              {cmpInd && <span className="text-sm font-normal text-muted-foreground"> ({cmpInd.unit}) — значения по всем ОМСУ, только просмотр</span>}
+            </DialogTitle>
+          </DialogHeader>
+          {cmpInd && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <ValueGroupHeader
+                    leading={<th rowSpan={2} className="text-left p-2 align-middle min-w-[140px]">ОМСУ</th>}
+                    trailing={<th rowSpan={2} className="text-left p-2 align-middle border-l">Статус</th>}
+                  />
+                </thead>
+                <tbody>
+                  {MUNICIPALITIES.map((m) => {
+                    const v = state.omsuValues[m.id]?.[cmpInd.id];
+                    if (!v) return null;
+                    const isCurrent = m.id === munId;
+                    return (
+                      <tr key={m.id} className={`border-b ${isCurrent ? 'bg-blue-50/60' : 'hover:bg-slate-50'}`}>
+                        <td className="p-2 font-medium">
+                          {m.name}
+                          {isCurrent && <span className="ml-1.5 text-xs text-blue-700">(ваше ОМСУ)</span>}
+                        </td>
+                        {VALUE_FIELDS.map((f) => (
+                          <td key={f.key} className={`p-1.5 text-center ${f.key === 'v2026' ? 'font-medium' : ''} ${fieldTint(f.key)}`}>
+                            {fmt(v[f.key])}
+                          </td>
+                        ))}
+                        <td className="p-2"><OmsuStatusBadge status={v.status} /></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
