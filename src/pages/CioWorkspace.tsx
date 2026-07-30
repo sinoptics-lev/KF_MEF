@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useStore } from '@/lib/store';
-import { MUNICIPALITIES, CURRENT_CIO, CIOS } from '@/lib/data';
+import { MUNICIPALITIES, CURRENT_CIO, CIOS, DIRECTIONS } from '@/lib/data';
 import { VALUE_FIELDS, emptyValueFields, type ValueFieldKey } from '@/lib/types';
 import { OmsuStatusBadge, CioStatusBadge } from '@/components/StatusBadge';
 import { ValueGroupHeader, fieldTint } from '@/components/ValueColumns';
+import { ValueTip, WithValueTip } from '@/components/ValueTip';
 import { SignDialog } from '@/components/SignDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
-import { CheckCircle2, Undo2, FileSignature, Lock, Info } from 'lucide-react';
+import { CheckCircle2, Undo2, FileSignature, Lock, Info, ChevronDown, ChevronRight } from 'lucide-react';
 import { fmt } from '@/lib/rating';
 
 export function CioWorkspace() {
@@ -23,6 +24,20 @@ export function CioWorkspace() {
   const [returnTarget, setReturnTarget] = useState<{ munId: string; indId: string } | null>(null);
   const [comment, setComment] = useState('');
   const [signTarget, setSignTarget] = useState<string | null>(null);
+
+  // Сворачивание согласования: сферы (по умолчанию развёрнуты) и показатели (по умолчанию свёрнуты)
+  const [openDirs, setOpenDirs] = useState<Record<string, boolean>>({});
+  const [openInds, setOpenInds] = useState<Record<string, boolean>>({});
+  const dirOpen = (id: string) => openDirs[id] ?? true;
+  const indOpen = (id: string) => openInds[id] ?? false;
+  const setAll = (open: boolean) => {
+    const nd: Record<string, boolean> = {};
+    DIRECTIONS.forEach((d) => { nd[d.id] = open; });
+    setOpenDirs(nd);
+    const ni: Record<string, boolean> = {};
+    state.indicators.forEach((i) => { ni[i.id] = open; });
+    setOpenInds(ni);
+  };
 
   const myIndicators = state.indicators.filter((i) => i.cioId === CURRENT_CIO);
   const pendingCount = MUNICIPALITIES.reduce(
@@ -61,79 +76,140 @@ export function CioWorkspace() {
         <TabsContent value="approve" className="space-y-4 mt-4">
           <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm flex gap-2">
             <Info className="h-4 w-4 text-blue-700 mt-0.5 shrink-0" />
-            <span>
+            <span className="flex-1">
               Согласуйте подписанные ЭЦП значения ОМСУ по показателям вашей отрасли или верните на доработку с комментарием.
-              После согласования изменение показателя ОМСУ блокируется.
+              После согласования изменение показателя ОМСУ блокируется. Наведите курсор на значение, чтобы увидеть дату
+              внесения и ФИО внёсшего данные. Сферы и показатели можно сворачивать.
+            </span>
+            <span className="flex shrink-0 gap-1 self-start text-xs">
+              <button
+                onClick={() => setAll(true)}
+                className="rounded border border-blue-300 bg-white px-2 py-1 font-medium text-blue-800 hover:bg-blue-100"
+              >
+                Развернуть всё
+              </button>
+              <button
+                onClick={() => setAll(false)}
+                className="rounded border border-blue-300 bg-white px-2 py-1 font-medium text-blue-800 hover:bg-blue-100"
+              >
+                Свернуть всё
+              </button>
             </span>
           </div>
 
-          {myIndicators.map((ind) => (
-            <Card key={ind.id}>
-              <CardHeader className="py-3">
-                <CardTitle className="text-base">
-                  {ind.num}. {ind.name} <span className="text-sm font-normal text-muted-foreground">({ind.unit})</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 overflow-x-auto">
-                <table className="w-full text-sm border-collapse">
-                  <thead>
-                    <ValueGroupHeader
-                      leading={<th rowSpan={2} className="text-left p-2 align-middle min-w-[130px]">ОМСУ</th>}
-                      trailing={(
-                        <>
-                          <th rowSpan={2} className="text-left p-2 align-middle border-l">Статус</th>
-                          <th rowSpan={2} className="text-left p-2 align-middle">Обновлено</th>
-                          <th rowSpan={2} className="text-right p-2 w-64 align-middle">Действия</th>
-                        </>
-                      )}
-                    />
-                  </thead>
-                  <tbody>
-                    {MUNICIPALITIES.map((m) => {
-                      const v = state.omsuValues[m.id]?.[ind.id];
-                      if (!v) return null;
-                      return (
-                        <tr key={m.id} className={`border-b ${v.status === 'pending_cio' ? 'bg-amber-50/60' : 'hover:bg-slate-50'}`}>
-                          <td className="p-2 font-medium">{m.name}</td>
-                          {VALUE_FIELDS.map((f) => (
-                            <td key={f.key} className={`p-1.5 text-center ${f.key === 'v2026' ? 'font-medium' : ''} ${fieldTint(f.key)}`}>
-                              {fmt(v[f.key])}
-                            </td>
-                          ))}
-                          <td className="p-2"><OmsuStatusBadge status={v.status} /></td>
-                          <td className="p-2 text-xs text-muted-foreground">{v.updatedAt ?? '—'}</td>
-                          <td className="p-2 text-right whitespace-nowrap">
-                            {v.status === 'pending_cio' && (
-                              <div className="flex gap-1 justify-end">
-                                <Button
-                                  size="sm"
-                                  onClick={() => dispatch({ type: 'CIO_APPROVE', munId: m.id, indId: ind.id, actor: cio.short })}
-                                >
-                                  <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Согласовать
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => { setReturnTarget({ munId: m.id, indId: ind.id }); setComment(''); }}
-                                >
-                                  <Undo2 className="h-3.5 w-3.5 mr-1" /> Вернуть
-                                </Button>
-                              </div>
-                            )}
-                            {v.status === 'approved' && (
-                              <span className="inline-flex items-center gap-1 text-xs text-green-700">
-                                <Lock className="h-3.5 w-3.5" /> заблокировано
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
-          ))}
+          {DIRECTIONS.map((d) => {
+            const inds = myIndicators.filter((i) => i.directionId === d.id);
+            if (!inds.length) return null;
+            const dOpen = dirOpen(d.id);
+            const dirPend = inds.reduce(
+              (acc, i) => acc + MUNICIPALITIES.filter((m) => state.omsuValues[m.id]?.[i.id]?.status === 'pending_cio').length,
+              0,
+            );
+            return (
+              <Card key={d.id}>
+                <CardHeader className="py-3">
+                  <button
+                    onClick={() => setOpenDirs((p) => ({ ...p, [d.id]: !dOpen }))}
+                    className="flex w-full items-center gap-2 text-left"
+                  >
+                    {dOpen ? <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" /> : <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" />}
+                    <CardTitle className="text-base flex-1">{d.name}</CardTitle>
+                    <span className="text-xs font-normal text-muted-foreground">
+                      Показателей: {inds.length}
+                      {dirPend > 0 && <span className="text-amber-700"> · На согласовании: {dirPend}</span>}
+                    </span>
+                  </button>
+                </CardHeader>
+                {dOpen && (
+                <CardContent className="pt-0 space-y-3">
+                  {inds.map((ind) => {
+                    const iOpen = indOpen(ind.id);
+                    const rows = MUNICIPALITIES
+                      .map((m) => ({ m, v: state.omsuValues[m.id]?.[ind.id] }))
+                      .filter((r) => r.v);
+                    const appr = rows.filter((r) => r.v!.status === 'approved').length;
+                    const pend = rows.filter((r) => r.v!.status === 'pending_cio').length;
+                    return (
+                      <div key={ind.id} className="rounded-md border">
+                        <button
+                          onClick={() => setOpenInds((p) => ({ ...p, [ind.id]: !iOpen }))}
+                          className="flex w-full flex-wrap items-center justify-between gap-2 px-3 py-2 text-left border-b bg-slate-50/70 hover:bg-slate-100/70"
+                        >
+                          <div className="font-medium text-sm flex items-center gap-2 min-w-0">
+                            {iOpen ? <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" /> : <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" />}
+                            <span className="truncate">
+                              {ind.num}. {ind.name} <span className="font-normal text-muted-foreground">({ind.unit})</span>
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="text-muted-foreground">Согласовано: {appr} из {rows.length}</span>
+                            {pend > 0 && <Badge className="bg-amber-500">На согласовании: {pend}</Badge>}
+                          </div>
+                        </button>
+                        {iOpen && (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm border-collapse">
+                            <thead>
+                              <ValueGroupHeader
+                                leading={<th rowSpan={2} className="text-left p-2 align-middle min-w-[130px]">ОМСУ</th>}
+                                trailing={(
+                                  <>
+                                    <th rowSpan={2} className="text-left p-2 align-middle border-l">Статус</th>
+                                    <th rowSpan={2} className="text-left p-2 align-middle">Обновлено</th>
+                                    <th rowSpan={2} className="text-right p-2 w-64 align-middle">Действия</th>
+                                  </>
+                                )}
+                              />
+                            </thead>
+                            <tbody>
+                              {rows.map(({ m, v }) => (
+                                <tr key={m.id} className={`border-b ${v!.status === 'pending_cio' ? 'bg-amber-50/60' : 'hover:bg-slate-50'}`}>
+                                  <td className="p-2 font-medium">{m.name}</td>
+                                  {VALUE_FIELDS.map((f) => (
+                                    <td key={f.key} className={`p-1.5 text-center ${f.key === 'v2026' ? 'font-medium' : ''} ${fieldTint(f.key)}`}>
+                                      <ValueTip value={v![f.key]} updatedAt={v!.updatedAt} author={v!.signedBy ?? 'Иванова А.П.'} />
+                                    </td>
+                                  ))}
+                                  <td className="p-2"><OmsuStatusBadge status={v!.status} /></td>
+                                  <td className="p-2 text-xs text-muted-foreground">{v!.updatedAt ?? '—'}</td>
+                                  <td className="p-2 text-right whitespace-nowrap">
+                                    {v!.status === 'pending_cio' && (
+                                      <div className="flex gap-1 justify-end">
+                                        <Button
+                                          size="sm"
+                                          onClick={() => dispatch({ type: 'CIO_APPROVE', munId: m.id, indId: ind.id, actor: cio.short })}
+                                        >
+                                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Согласовать
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => { setReturnTarget({ munId: m.id, indId: ind.id }); setComment(''); }}
+                                        >
+                                          <Undo2 className="h-3.5 w-3.5 mr-1" /> Вернуть
+                                        </Button>
+                                      </div>
+                                    )}
+                                    {v!.status === 'approved' && (
+                                      <span className="inline-flex items-center gap-1 text-xs text-green-700">
+                                        <Lock className="h-3.5 w-3.5" /> заблокировано
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </CardContent>
+                )}
+              </Card>
+            );
+          })}
         </TabsContent>
 
         <TabsContent value="own" className="space-y-4 mt-4">
@@ -176,24 +252,28 @@ export function CioWorkspace() {
                           return (
                             <td key={f.key} className={`p-1.5 text-center ${fieldTint(f.key)}`}>
                               {editable ? (
-                                <Input
-                                  type="number"
-                                  step="0.1"
-                                  className="h-8 w-[76px] text-center mx-auto bg-white px-1"
-                                  placeholder="—"
-                                  value={v[f.key] ?? ''}
-                                  onChange={(e) =>
-                                    dispatch({
-                                      type: 'CIO_SET_OWN',
-                                      cioIndId: ind.id,
-                                      cioId: CURRENT_CIO,
-                                      field: f.key,
-                                      value: e.target.value === '' ? null : Number(e.target.value),
-                                    })
-                                  }
-                                />
+                                <WithValueTip show={v[f.key] !== null} updatedAt={v.updatedAt} author={v.signedBy ?? 'Петров С.И.'}>
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    className="h-8 w-[76px] text-center mx-auto bg-white px-1"
+                                    placeholder="—"
+                                    value={v[f.key] ?? ''}
+                                    onChange={(e) =>
+                                      dispatch({
+                                        type: 'CIO_SET_OWN',
+                                        cioIndId: ind.id,
+                                        cioId: CURRENT_CIO,
+                                        field: f.key,
+                                        value: e.target.value === '' ? null : Number(e.target.value),
+                                      })
+                                    }
+                                  />
+                                </WithValueTip>
                               ) : (
-                                <span className={f.key === 'v2026' ? 'font-medium' : ''}>{fmt(v[f.key])}</span>
+                                <span className={f.key === 'v2026' ? 'font-medium' : ''}>
+                                  <ValueTip value={v[f.key]} updatedAt={v.updatedAt} author={v.signedBy ?? 'Петров С.И.'} />
+                                </span>
                               )}
                               <div className="mt-1 text-[11px] whitespace-nowrap">
                                 <span className="text-muted-foreground">ср. ОМСУ: </span>

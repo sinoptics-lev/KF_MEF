@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { useStore } from '@/lib/store';
 import { DIRECTIONS, CIOS, CURRENT_OMSU, MUNICIPALITIES } from '@/lib/data';
 import { VALUE_FIELDS } from '@/lib/types';
-import { OmsuStatusBadge } from '@/components/StatusBadge';
+import { OmsuStatusBadge, CioStatusBadge } from '@/components/StatusBadge';
 import { ValueGroupHeader, fieldTint } from '@/components/ValueColumns';
+import { ValueTip, WithValueTip } from '@/components/ValueTip';
 import { SignDialog } from '@/components/SignDialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,7 +17,6 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { FileSignature, Undo2, Lock, AlertTriangle, Info, ChevronDown, Users } from 'lucide-react';
-import { fmt } from '@/lib/rating';
 
 /** Сводка статусов по набору показателей сферы */
 function dirStats(inds: { id: string }[], values: Record<string, { status: string } | undefined>) {
@@ -175,24 +175,28 @@ export function OmsuForm() {
                           {VALUE_FIELDS.map((f) => (
                             <td key={f.key} className={`p-1.5 text-center ${fieldTint(f.key)}`}>
                               {editable ? (
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  className="h-8 w-[76px] text-center mx-auto px-1"
-                                  placeholder="—"
-                                  value={v[f.key] ?? ''}
-                                  onChange={(e) =>
-                                    dispatch({
-                                      type: 'OMSU_SET_VALUE',
-                                      munId,
-                                      indId: ind.id,
-                                      field: f.key,
-                                      value: e.target.value === '' ? null : Number(e.target.value),
-                                    })
-                                  }
-                                />
+                                <WithValueTip show={v[f.key] !== null} updatedAt={v.updatedAt} author={v.signedBy ?? 'Иванова А.П.'}>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    className="h-8 w-[76px] text-center mx-auto px-1"
+                                    placeholder="—"
+                                    value={v[f.key] ?? ''}
+                                    onChange={(e) =>
+                                      dispatch({
+                                        type: 'OMSU_SET_VALUE',
+                                        munId,
+                                        indId: ind.id,
+                                        field: f.key,
+                                        value: e.target.value === '' ? null : Number(e.target.value),
+                                      })
+                                    }
+                                  />
+                                </WithValueTip>
                               ) : (
-                                <span className={f.key === 'v2026' ? 'font-medium' : ''}>{fmt(v[f.key])}</span>
+                                <span className={f.key === 'v2026' ? 'font-medium' : ''}>
+                                  <ValueTip value={v[f.key]} updatedAt={v.updatedAt} author={v.signedBy ?? 'Иванова А.П.'} />
+                                </span>
                               )}
                             </td>
                           ))}
@@ -266,11 +270,29 @@ export function OmsuForm() {
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <ValueGroupHeader
-                    leading={<th rowSpan={2} className="text-left p-2 align-middle min-w-[140px]">ОМСУ</th>}
+                    leading={<th rowSpan={2} className="text-left p-2 align-middle min-w-[140px]">Участник</th>}
                     trailing={<th rowSpan={2} className="text-left p-2 align-middle border-l">Статус</th>}
                   />
                 </thead>
                 <tbody>
+                  {/* Ответственный ЦИО — собственное значение по показателю */}
+                  {(() => {
+                    const cio = CIOS.find((c) => c.id === cmpInd.cioId);
+                    const cv = state.cioValues[cmpInd.id]?.[cmpInd.cioId];
+                    return (
+                      <tr className="border-b bg-violet-50/40">
+                        <td className="p-2 font-medium">
+                          {cio?.short} <span className="text-xs font-normal text-violet-700">(ответственный ЦИО)</span>
+                        </td>
+                        {VALUE_FIELDS.map((f) => (
+                          <td key={f.key} className={`p-1.5 text-center ${f.key === 'v2026' ? 'font-medium' : ''}`}>
+                            <ValueTip value={cv?.[f.key] ?? null} updatedAt={cv?.updatedAt ?? null} author={cv?.signedBy ?? 'Петров С.И.'} />
+                          </td>
+                        ))}
+                        <td className="p-2">{cv ? <CioStatusBadge status={cv.status} /> : <span className="text-xs text-muted-foreground">нет данных</span>}</td>
+                      </tr>
+                    );
+                  })()}
                   {MUNICIPALITIES.map((m) => {
                     const v = state.omsuValues[m.id]?.[cmpInd.id];
                     if (!v) return null;
@@ -283,7 +305,7 @@ export function OmsuForm() {
                         </td>
                         {VALUE_FIELDS.map((f) => (
                           <td key={f.key} className={`p-1.5 text-center ${f.key === 'v2026' ? 'font-medium' : ''} ${fieldTint(f.key)}`}>
-                            {fmt(v[f.key])}
+                            <ValueTip value={v[f.key]} updatedAt={v.updatedAt} author={v.signedBy ?? 'Иванова А.П.'} />
                           </td>
                         ))}
                         <td className="p-2"><OmsuStatusBadge status={v.status} /></td>
