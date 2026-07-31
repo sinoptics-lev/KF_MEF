@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { MUNICIPALITIES, DIRECTIONS } from '@/lib/data';
 import { computeRating, computeDirectionRatings, rankColor, fmt } from '@/lib/rating';
+import { EMPTY_TREE_FILTER, chevronParents, visibleTree, type TreeFilter } from '@/lib/indTree';
+import { IndToolbar, TreeToggle } from '@/components/IndToolbar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -36,6 +38,12 @@ export function RatingView() {
   const dirRows = useMemo(() => computeDirectionRatings(state, rows), [state, rows]);
   const [selMun, setSelMun] = useState(MUNICIPALITIES[0].id);
   const [selInd, setSelInd] = useState<string>('total');
+  // дерево показателей в сводной оценке по территории
+  const [treeFilter, setTreeFilter] = useState<TreeFilter>(EMPTY_TREE_FILTER);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const visible = visibleTree(state.indicators, collapsed, treeFilter);
+  const parents = chevronParents(state.indicators, treeFilter);
+  const toggleNode = (id: string) => setCollapsed((p) => ({ ...p, [id]: !p[id] }));
 
   const n = MUNICIPALITIES.length;
   const mun = rows.find((r) => r.munId === selMun)!;
@@ -102,6 +110,14 @@ export function RatingView() {
                 </Select>
                 {!mun.complete && <Badge variant="outline" className="text-amber-700 border-amber-300">неполные данные ({mun.missing} показ.)</Badge>}
               </div>
+              <div className="mb-3">
+                <IndToolbar
+                  filter={treeFilter}
+                  onChange={setTreeFilter}
+                  shown={visible.length}
+                  total={state.indicators.length}
+                />
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
@@ -125,7 +141,8 @@ export function RatingView() {
                     </tr>
                     {DIRECTIONS.map((d) => {
                       const dr = dirRows[d.id]?.[selMun];
-                      const inds = state.indicators.filter((i) => i.directionId === d.id);
+                      const inds = visible.filter((i) => i.directionId === d.id);
+                      if (!inds.length) return [];
                       return [
                         <tr key={d.id} className="font-medium bg-slate-50/60">
                           <td className={tdCls}>{d.name}</td>
@@ -136,10 +153,38 @@ export function RatingView() {
                           <td className={tdCls} style={{ background: rankColor(dr?.place ?? null, n) }}>{dr?.place ?? '—'}</td>
                         </tr>,
                         ...inds.map((ind) => {
+                          if (ind.isGroup) {
+                            return (
+                              <tr key={ind.id} className="bg-slate-50/40">
+                                <td className={tdCls} colSpan={6}>
+                                  <span className="flex items-center gap-1 font-semibold text-slate-600" style={{ paddingLeft: `${24 + (ind.level - 1) * 18}px` }}>
+                                    <TreeToggle
+                                      hasChildren={parents.has(ind.id)}
+                                      collapsed={!!collapsed[ind.id]}
+                                      onToggle={() => toggleNode(ind.id)}
+                                    />
+                                    <span>
+                                      <span className="mr-1 text-slate-400">▸</span>
+                                      {ind.num} {ind.name}
+                                    </span>
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          }
                           const c = mun.cells[ind.id];
                           return (
                             <tr key={ind.id}>
-                              <td className={`${tdCls} pl-6`}>{ind.num} {ind.name}</td>
+                              <td className={tdCls}>
+                                <span className="flex items-center gap-1" style={{ paddingLeft: `${24 + (ind.level - 1) * 18}px` }}>
+                                  <TreeToggle
+                                    hasChildren={parents.has(ind.id)}
+                                    collapsed={!!collapsed[ind.id]}
+                                    onToggle={() => toggleNode(ind.id)}
+                                  />
+                                  <span>{ind.num} {ind.name}</span>
+                                </span>
+                              </td>
                               <td className={tdCls} style={{ background: rankColor(c?.rank ?? null, n) }}>
                                 {fmt(c?.value ?? null)}{c && !c.approved && c.value !== null && mode === 'preview' ? ' *' : ''}
                               </td>
@@ -166,7 +211,7 @@ export function RatingView() {
                   <SelectContent>
                     <SelectItem value="total">Итоговый рейтинг</SelectItem>
                     {DIRECTIONS.map((d) => <SelectItem key={d.id} value={d.id}>Направление: {d.name}</SelectItem>)}
-                    {state.indicators.map((i) => <SelectItem key={i.id} value={i.id}>{i.num} {i.name}</SelectItem>)}
+                    {state.indicators.filter((i) => !i.isGroup).map((i) => <SelectItem key={i.id} value={i.id}>{i.num} {i.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -221,7 +266,7 @@ export function RatingView() {
                   <thead>
                     <tr>
                       <th className={`${thCls} sticky left-0 z-10 min-w-[140px]`}>Территория</th>
-                      {state.indicators.map((ind) => (
+                      {state.indicators.filter((i) => !i.isGroup).map((ind) => (
                         <th key={ind.id} className={`${thCls} text-center`} title={ind.name}>{ind.num}</th>
                       ))}
                       <th className={`${thCls} text-center`}>Σ мест</th>
@@ -232,7 +277,7 @@ export function RatingView() {
                     {[...rows].sort((a, b) => (a.place ?? 999) - (b.place ?? 999)).map((r) => (
                       <tr key={r.munId}>
                         <td className={`${tdCls} sticky left-0 bg-white font-medium`}>{r.name}</td>
-                        {state.indicators.map((ind) => {
+                        {state.indicators.filter((i) => !i.isGroup).map((ind) => {
                           const c = r.cells[ind.id];
                           return (
                             <td
@@ -278,7 +323,7 @@ function CompareVariants() {
     return rows.map((r) => {
       let sum = 0;
       let cnt = 0;
-      state.indicators.forEach((ind) => {
+      state.indicators.filter((i) => !i.isGroup).forEach((ind) => {
         const c = r.cells[ind.id];
         if (c?.rank !== null && c?.rank !== undefined) {
           sum += (100 * (1 - (c.rank - 1) / Math.max(n - 1, 1))) * (ind.weight || 1);
