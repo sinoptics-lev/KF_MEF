@@ -7,6 +7,7 @@ import { Setup } from '@/pages/Setup';
 import { OmsuForm } from '@/pages/OmsuForm';
 import { CioWorkspace } from '@/pages/CioWorkspace';
 import { MefWorkspace } from '@/pages/MefWorkspace';
+import { MefManage } from '@/pages/MefManage';
 import { RatingView } from '@/pages/RatingView';
 import { Description } from '@/pages/Description';
 import { Home } from '@/pages/Home';
@@ -18,7 +19,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Bell, Landmark, UserRound, BookOpen, Home as HomeIcon } from 'lucide-react';
 
-type PageId = 'overview' | 'setup' | 'omsu' | 'cio' | 'mef' | 'rating' | 'about';
+type PageId = 'overview' | 'setup' | 'omsu' | 'cio' | 'mef' | 'mef-manage' | 'rating' | 'about';
 type BlockId = 'mun' | 'obl' | 'params' | 'form2p';
 
 const BLOCK_LABELS: Record<BlockId, string> = {
@@ -43,8 +44,9 @@ const NAV: Record<RoleId, { id: PageId; label: string }[]> = {
   ],
   mef: [
     { id: 'overview', label: 'Обзор сбора' },
-    { id: 'mef', label: 'Управление и согласование' },
-    { id: 'rating', label: 'Рейтинг' },
+    { id: 'mef-manage', label: 'Управление' },
+    { id: 'mef', label: 'Рабочее место МЭФ' },
+    { id: 'rating', label: 'Выходные формы' },
   ],
   cio: [
     { id: 'cio', label: 'Рабочее место ЦИО' },
@@ -56,7 +58,7 @@ const NAV: Record<RoleId, { id: PageId; label: string }[]> = {
 
 const DEFAULT_PAGE: Record<RoleId, PageId> = {
   admin: 'setup',
-  mef: 'mef',
+  mef: 'mef-manage',
   cio: 'cio',
   omsu: 'omsu',
 };
@@ -218,8 +220,9 @@ function Shell({ onHome }: { onHome: () => void }) {
         {page === 'overview' && <Overview role={role} />}
         {page === 'setup' && <Setup />}
         {page === 'omsu' && <OmsuForm />}
-        {page === 'cio' && <CioWorkspace />}
-        {page === 'mef' && <MefWorkspace goRating={() => setPage('rating')} />}
+        {page === 'cio' && <CioWorkspace key={block} hideOmsuApprove={block !== 'mun'} />}
+        {page === 'mef' && <MefWorkspace key={block} hideOmsuApprove={block !== 'mun'} />}
+        {page === 'mef-manage' && <MefManage goRating={() => setPage('rating')} />}
         {page === 'rating' && <RatingView />}
         {page === 'about' && <Description />}
       </main>
