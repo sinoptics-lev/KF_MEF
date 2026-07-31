@@ -1,4 +1,4 @@
-import { CIOS } from '@/lib/data';
+import { CIOS, MUNICIPALITIES } from '@/lib/data';
 import { isTreeFilterActive, type TreeFilter } from '@/lib/indTree';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -35,10 +35,15 @@ interface Props {
   /** Сколько узлов показано / всего (выводится при активном фильтре) */
   shown?: number;
   total?: number;
+  /** Не показывать фильтр по ответственному ЦИО */
+  hideCioFilter?: boolean;
+  /** Фильтр по ОМСУ (если задан вместе с onMunChange) */
+  munId?: string;
+  onMunChange?: (v: string) => void;
 }
 
-/** Панель над таблицами показателей: поиск, фильтр по ЦИО, «Скрыть справочные» */
-export function IndToolbar({ filter, onChange, shown, total }: Props) {
+/** Панель над таблицами показателей: поиск, фильтр по ЦИО / ОМСУ, «Скрыть справочные» */
+export function IndToolbar({ filter, onChange, shown, total, hideCioFilter, munId, onMunChange }: Props) {
   const active = isTreeFilterActive(filter);
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-md border bg-white px-3 py-2">
@@ -51,15 +56,28 @@ export function IndToolbar({ filter, onChange, shown, total }: Props) {
           onChange={(e) => onChange({ ...filter, query: e.target.value })}
         />
       </div>
-      <Select value={filter.cioId} onValueChange={(v) => onChange({ ...filter, cioId: v })}>
-        <SelectTrigger className="h-9 w-[240px]">
-          <SelectValue placeholder="Ответственный ЦИО" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Все ответственные ЦИО</SelectItem>
-          {CIOS.map((c) => <SelectItem key={c.id} value={c.id}>{c.short}</SelectItem>)}
-        </SelectContent>
-      </Select>
+      {!hideCioFilter && (
+        <Select value={filter.cioId} onValueChange={(v) => onChange({ ...filter, cioId: v })}>
+          <SelectTrigger className="h-9 w-[240px]">
+            <SelectValue placeholder="Ответственный ЦИО" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Все ответственные ЦИО</SelectItem>
+            {CIOS.map((c) => <SelectItem key={c.id} value={c.id}>{c.short}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      )}
+      {munId !== undefined && onMunChange && (
+        <Select value={munId} onValueChange={onMunChange}>
+          <SelectTrigger className="h-9 w-[240px]">
+            <SelectValue placeholder="ОМСУ" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Все ОМСУ</SelectItem>
+            {MUNICIPALITIES.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      )}
       <div className="flex items-center gap-2">
         <Switch
           id="hide-ref"

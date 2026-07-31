@@ -26,7 +26,7 @@ export const ROLES: Role[] = [
   },
   {
     id: 'cio',
-    name: 'ЦИО-куратор',
+    name: 'Пользователь ЦИО',
     org: 'Министерство инвестиций, промышленности и науки Московской области',
     description: 'Согласование форм ОМСУ и внесение собственных значений по закреплённым показателям',
   },
@@ -144,7 +144,7 @@ export const INDICATORS: Indicator[] = [
   { id: 'i52', num: '9.3.2', name: 'Справочно: ввод жилья в многоквартирных жилых домах', directionId: 'd5', cioId: 'c3', unit: 'тыс. кв. м общей площади', optimum: 'max', weight: 1, formula: '—', level: 2, parentId: 'i50' },
   { id: 'i53', num: '11.1', name: 'Справочно: Количество созданных рабочих мест всего (на крупных и средних предприятиях, на малых предприятиях (включая микропредприятия) и индивидуальные предприниматели)', directionId: 'd6', cioId: 'c2', unit: 'единица', optimum: 'max', weight: 1, formula: '—', level: 1, parentId: null },
   { id: 'i54', num: '11.2', name: 'Количество созданных рабочих мест', directionId: 'd6', cioId: 'c2', unit: 'единица', optimum: 'max', weight: 1, formula: '—', level: 1, parentId: null },
-  { id: 'i55', num: '11.3', name: 'Справочно: Количество созданных рабочих мест на малых предприятиях (включая микропредприятия) и индивидуальные предприниматели', directionId: 'd6', cioId: 'c2', unit: 'единица', optimum: 'max', weight: 1, formula: '—', level: 1, parentId: null },
+  { id: 'i55', num: '11.3', name: 'Справочно: Количество созданных рабочих мест на малых предприятиях (включая микропредприятия) и индивидуальные предприниматели)', directionId: 'd6', cioId: 'c2', unit: 'единица', optimum: 'max', weight: 1, formula: '—', level: 1, parentId: null },
   { id: 'i56', num: '11.4', name: 'Численность официально зарегистрированных безработных, на конец года', directionId: 'd6', cioId: 'c4', unit: 'человек', optimum: 'min', weight: 1, formula: '—', level: 1, parentId: null },
   { id: 'i57', num: '11.5', name: 'Фонд начисленной заработной платы', directionId: 'd6', cioId: 'c1', unit: 'млн. рублей', optimum: 'max', weight: 1, formula: '—', level: 1, parentId: null },
   { id: 'i58', num: '11.5.1', name: 'Справочно: темп роста фонда заработной платы', directionId: 'd6', cioId: 'c1', unit: 'процент к предыдущему году', optimum: 'max', weight: 1, formula: '—', level: 2, parentId: 'i57' },
