@@ -21,6 +21,7 @@ export type Action =
   | { type: 'MEF_RETURN'; cioIndId: string; cioId: string; actor: string; comment: string }
   | { type: 'CAMPAIGN_SCHEDULE'; startDate: string; deadlineOmsu: string; deadlineCio: string; deadlineMef: string }
   | { type: 'CAMPAIGN_LAUNCH' }
+  | { type: 'CAMPAIGN_STOP' }
   | { type: 'SET_RATING_MODE'; mode: 'preview' | 'final' }
   | { type: 'PUBLISH_FINAL' }
   | { type: 'ADD_INDICATOR'; indicator: Indicator }
@@ -192,6 +193,13 @@ function reducer(state: AppState, a: Action): AppState {
         campaign: { ...state.campaign, status: 'collecting', launchedAt: now() },
         notifications: [...state.notifications, { id: ++notifId, at: now(), text: `Начат сбор данных «${state.campaign.name} — ${state.campaign.period}». Формы разосланы ОМСУ и ЦИО`, forRoles: ['omsu', 'cio', 'mef'] }],
         history: [...state.history, { at: now(), actor: 'КФ (автоматически)', action: 'Разосланы уведомления и формы ОМСУ и ЦИО' }],
+      };
+    case 'CAMPAIGN_STOP':
+      return {
+        ...state,
+        campaign: { ...state.campaign, status: 'scheduled' },
+        notifications: [...state.notifications, { id: ++notifId, at: now(), text: `Сбор данных «${state.campaign.name} — ${state.campaign.period}» остановлен куратором МЭФ`, forRoles: ['omsu', 'cio', 'mef'] }],
+        history: [...state.history, { at: now(), actor: 'Куратор МЭФ', action: 'Остановлен сбор данных' }],
       };
     case 'SET_RATING_MODE':
       return { ...state, ratingMode: a.mode };

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, PlayCircle, CalendarClock, Send, BarChart3 } from 'lucide-react';
+import { CheckCircle2, PlayCircle, StopCircle, CalendarClock, Send, BarChart3 } from 'lucide-react';
 import { approvalStats, allApproved } from '@/lib/rating';
 
 /** Вкладка «Управление» МЭФ: управление сбором, сроки, готовность к рейтингу */
@@ -58,16 +58,22 @@ export function MefManage({ goRating }: { goRating: () => void }) {
               >
                 <CalendarClock className="h-4 w-4 mr-1" /> Сохранить даты
               </Button>
-              {state.campaign.status !== 'collecting' && state.campaign.status !== 'completed' && (
-                <Button onClick={() => dispatch({ type: 'CAMPAIGN_LAUNCH' })}>
-                  <PlayCircle className="h-4 w-4 mr-1" /> Запустить сбор
-                </Button>
-              )}
-              {state.campaign.status === 'collecting' && (
-                <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
-                  <Send className="h-3.5 w-3.5 mr-1" />
-                  Сбор запущен {state.campaign.launchedAt}
-                </Badge>
+              {state.campaign.status === 'collecting' ? (
+                <>
+                  <Button variant="destructive" onClick={() => dispatch({ type: 'CAMPAIGN_STOP' })}>
+                    <StopCircle className="h-4 w-4 mr-1" /> Остановить сбор
+                  </Button>
+                  <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+                    <Send className="h-3.5 w-3.5 mr-1" />
+                    Сбор запущен {state.campaign.launchedAt}
+                  </Badge>
+                </>
+              ) : (
+                state.campaign.status !== 'completed' && (
+                  <Button onClick={() => dispatch({ type: 'CAMPAIGN_LAUNCH' })}>
+                    <PlayCircle className="h-4 w-4 mr-1" /> Запустить сбор
+                  </Button>
+                )
               )}
             </div>
             <p className="text-xs text-muted-foreground">
